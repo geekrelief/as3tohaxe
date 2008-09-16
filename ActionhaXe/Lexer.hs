@@ -1,5 +1,7 @@
 -- Turn the as3 source into Tokens for parsing
 
+module ActionhaXe.Lexer where
+
 import Text.Parsec
 import Text.Parsec.String (Parser)
 import Text.Parsec.Char
@@ -20,7 +22,7 @@ data Token =
            | TokenNum TokenNum
            | TokenIdent String
            | TokenStringLit String
-           | TokenNL
+           | TokenNl
            | TokenRegex (String, String)
            | TokenEof
            | TokenKw String
@@ -64,9 +66,11 @@ operator' []     = fail " failed "
 
 operator = operator' $ sortByLength operators
 
-quotedDString = do{ s <- between (char '"') (char '"') (many (satisfy (\c -> isPrint c && c /= '"'))); return s}
+quotedDString = do{ s <- between (char '"') (char '"') (many (satisfy (\c -> isPrint c && c /= '"'))); return $ "\"" ++ s ++ "\""}
+quotedSString = do{ s <- between (char '\'') (char '\'') (many (satisfy (\c -> isPrint c && c /= '\''))); return $ "'" ++ s ++ "'"}
 
-quotedSString = do{ s <- between (char '\'') (char '\'') (many (satisfy (\c -> isPrint c && c /= '\''))); return s}
+commentSLine = do{ s <- between (string "//") newline (many (satisfy(\c -> c /= '\n'))); i <- getInput; setInput $ "\n"++i ; return $ "//"++s}
+commentMLine = do{ string "/*"; s <- manyTill anyChar (try(string "*/")); return $ "/*"++s++"*/" }
 
 --type Parser = Parsec Token ()
 whiteSpace :: Parser String
@@ -78,12 +82,15 @@ atoken =
          try (do{ x <- many1 digit; char '.'; y <- many1 digit; return $ TokenNum $ TokenDouble $ read (x++"."++y)  })
      <|> try (do{ x <- many1 digit; return $ TokenNum $ TokenInteger $ read x })
      <|> try (do{ x <- keyword; return $ TokenKw x})
+     <|> try (do{ x <- commentSLine; return $ TokenComment x})
+     <|> try (do{ x <- commentMLine; return $ TokenComment x})
      <|> try (do{ x <- operator; return $ TokenOp x})
      <|> try (do{ x <- identifier; return $ TokenIdent x})
      <|> try (do{ x <- quotedDString; return $ TokenStringLit x})
      <|> try (do{ x <- quotedSString; return $ TokenStringLit x})
      <|> try (do{ x <- whiteSpace; return $ TokenWhite x}) 
-     <|> try (do{ char '\n'; return TokenNL })
+     <|> try (do{ char '\n'; eof; return TokenEof })
+     <|> try (do{ char '\n'; return TokenNl })
      <|> try (do{ x <- anyToken; return $ TokenUnknown $ x:[]})
 
 
@@ -95,13 +102,16 @@ runLexer s = case parse lexer "" s of
                   Right l -> l
                   Left _ -> []
 
-unknowns t = [ x | x@(_, TokenUnknown a) <- t]
+--unknowns t = [ x | x@(_, TokenUnknown a) <- t]
 
 --main = print $ runLexer "   12  3.1   3  \n 123 \t\t"
-main = do contents <- readFile "HelloWorld.as"
+{-
+main = do args <- getArgs
+          contents <- readFile args!!1
           let tokens = runLexer contents
           putStrLn "Unknown Tokens--\n"
           print $ unknowns tokens
           putStrLn "\n\nTokenized--"
           print tokens
+-}
 --main = putStrLn "test"
