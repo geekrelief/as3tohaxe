@@ -46,7 +46,7 @@ operators = [ ".", "[", "]", "(", ")", "@", "::", "..", "{", "}",
               "++", "--", "-", "~", "!", "*", "/", "%",
               "+", "-", "<<", ">>", ">>>", "<", "<=", ">", ">=",
               "==", "!=", "===", "!==", "&", "^", "|", "&&", "||",
-              "?:", "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=",
+              "?", "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=",
               ">>>=", "&=", "^=", "|=", ",", ":", ";"
             ]
 
@@ -56,7 +56,7 @@ keyword = do { x <- many1 identChar; if (elem x $ keywords) then return x else u
 identifier :: Parser String
 identifier = do{ x <- many1 identChar; return x }
 
-identChar = satisfy (\c -> isAlphaNum c || c == '_')
+identChar = satisfy (\c -> isAlphaNum c || c == '_' || c == '$')
 
 sortByLength = sortBy (\x y -> compare (length y) (length x))
 
