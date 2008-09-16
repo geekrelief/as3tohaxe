@@ -4,22 +4,69 @@ import Text.Parsec
 import Text.Parsec.String (Parser)
 import Text.Parsec.Char
 import Data.Char
+import Data.List
 
 --import Control.Monad.Identity
+
+
+data TokenNum    = TokenInteger Integer
+                 | TokenDouble Double
+    deriving (Show, Eq)
+
 
 data Token = 
              TokenWhite String
            | TokenComment String
-           | TokenInt Int
+           | TokenNum TokenNum
            | TokenIdent String
            | TokenStringLit String
            | TokenNL
            | TokenRegex (String, String)
            | TokenEof
-           | TokenRID String
-           | TokenROP String
+           | TokenKw String
+           | TokenOp String
            | TokenXML String
-  deriving (Show, Eq)
+           | TokenUnknown String
+           | TokenRest String
+    deriving (Show, Eq)
+
+keywords = [ "as", "break", "case", "catch", "class", "const", "continue", "default",
+             "delete", "do", "else", "extends", "false", "finally", "for", "function", "if",
+             "implements", "internal", "is", "native", "new", "null", "package", "private",
+             "protected", "public", "return", "super", "switch", "this", "throw", "to",
+             "true", "try", "typeof", "use", "var", "void", "while", "with",
+-- syntactic keywords
+             "each", "get", "set", "namespace", "include", "dynamic", "final", "native",
+             "override", "static"
+           ]
+
+operators = [ ".", "[", "]", "(", ")", "@", "::", "..", "{", "}", 
+              "++", "--", "-", "~", "!", "*", "/", "%",
+              "+", "-", "<<", ">>", ">>>", "<", "<=", ">", ">=",
+              "==", "!=", "===", "!==", "&", "^", "|", "&&", "||",
+              "?:", "=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=",
+              ">>>=", "&=", "^=", "|=", ",", ":", ";"
+            ]
+
+keyword :: Parser String
+keyword = do { x <- many1 identChar; if (elem x $ keywords) then return x else unexpected "keyword" }
+
+identifier :: Parser String
+identifier = do{ x <- many1 identChar; return x }
+
+identChar = satisfy (\c -> isAlphaNum c || c == '_')
+
+sortByLength = sortBy (\x y -> compare (length y) (length x))
+
+operator' (o:os) = try (do{ s <- string o; return s })
+               <|> operator' os
+operator' []     = fail " failed "
+
+operator = operator' $ sortByLength operators
+
+quotedDString = do{ s <- between (char '"') (char '"') (many (satisfy (\c -> isPrint c && c /= '"'))); return s}
+
+quotedSString = do{ s <- between (char '\'') (char '\'') (many (satisfy (\c -> isPrint c && c /= '\''))); return s}
 
 --type Parser = Parsec Token ()
 whiteSpace :: Parser String
@@ -27,22 +74,34 @@ whiteSpace = many1 (satisfy (\c -> isSpace c && c /= '\n'))
 
 
 --atoken :: String -> Token
-atoken = try (do{ x <- many1 digit; return $ TokenInt $ read x })
-    <|>  try (do{ x <- whiteSpace; return $ TokenWhite x}) 
-    <|>  try (do{ char '\n'; return TokenNL })
-
-         --try (do{ eof; return TokenEof})
---         <?> "unidentifiable token"
+atoken = 
+         try (do{ x <- many1 digit; char '.'; y <- many1 digit; return $ TokenNum $ TokenDouble $ read (x++"."++y)  })
+     <|> try (do{ x <- many1 digit; return $ TokenNum $ TokenInteger $ read x })
+     <|> try (do{ x <- keyword; return $ TokenKw x})
+     <|> try (do{ x <- operator; return $ TokenOp x})
+     <|> try (do{ x <- identifier; return $ TokenIdent x})
+     <|> try (do{ x <- quotedDString; return $ TokenStringLit x})
+     <|> try (do{ x <- quotedSString; return $ TokenStringLit x})
+     <|> try (do{ x <- whiteSpace; return $ TokenWhite x}) 
+     <|> try (do{ char '\n'; return TokenNL })
+     <|> try (do{ x <- anyToken; return $ TokenUnknown $ x:[]})
 
 
 --lexer :: ParsecT String () Identity [Token]
-lexer = many (do { p <- getPosition; t <- atoken; return (p, t) })
+lexer = many1 (do { p <- getPosition; t <- atoken; return (p, t) })
 
 runLexer :: String -> [(SourcePos, Token)]
 runLexer s = case parse lexer "" s of
                   Right l -> l
                   Left _ -> []
 
-main = print $ runLexer "   12    3  \n 123 \t\t"
+unknowns t = [ x | x@(_, TokenUnknown a) <- t]
 
+--main = print $ runLexer "   12  3.1   3  \n 123 \t\t"
+main = do contents <- readFile "HelloWorld.as"
+          let tokens = runLexer contents
+          putStrLn "Unknown Tokens--\n"
+          print $ unknowns tokens
+          putStrLn "\n\nTokenized--"
+          print tokens
 --main = putStrLn "test"
