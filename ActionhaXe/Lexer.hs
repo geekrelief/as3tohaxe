@@ -5,6 +5,7 @@ module ActionhaXe.Lexer where
 import Text.Parsec
 import Text.Parsec.String (Parser)
 import Text.Parsec.Char
+import Text.Parsec.Perm
 import Data.Char
 import Data.List
 
@@ -21,13 +22,13 @@ data Token =
            | TokenComment String
            | TokenNum TokenNum
            | TokenIdent String
-           | TokenStringLit String
+           | TokenString String
            | TokenNl
            | TokenRegex (String, String)
            | TokenEof
            | TokenKw String
            | TokenOp String
-           | TokenXML String
+           | TokenXml String
            | TokenUnknown String
            | TokenRest String
     deriving (Show, Eq)
@@ -72,10 +73,18 @@ quotedSString = do{ s <- between (char '\'') (char '\'') (many (satisfy (\c -> i
 commentSLine = do{ s <- between (string "//") newline (many (satisfy(\c -> c /= '\n'))); i <- getInput; setInput $ "\n"++i ; return $ "//"++s}
 commentMLine = do{ string "/*"; s <- manyTill anyChar (try(string "*/")); return $ "/*"++s++"*/" }
 
+xml = do{ char '<'; t <- many1 (satisfy (\c -> isPrint c && c /= '>')); char '>'; x <- manyTill anyChar (try (string $ "</"++t++">")); return $ "<"++t++">"++x++"</"++t++">"}
+
+xmlSTag = do{ char '<'; t <- manyTill (satisfy (\c -> isPrint c && c /= '/' && c /= '>')) (string "/>"); return $ "<"++t++"/>"}
+
 --type Parser = Parsec Token ()
 whiteSpace :: Parser String
 whiteSpace = many1 (satisfy (\c -> isSpace c && c /= '\n'))
 
+--regexOptions :: Parser String
+regexOptions = permute (catter <$?> ('_', char 'g') <|?> ('_', char 'i') <|?> ('_', char 'm') <|?> ('_', char 's') <|?> ('_', char 'x'))
+    where catter g i m s x =  filter (\c -> c /= '_') [g, i, m, s, x]
+regex = do { char '/'; x <- noneOf "/*"; s <- manyTill anyChar (try (do {noneOf "\\"; char '/'})); o <- optionMaybe regexOptions; return $ maybe (("/"++(x:[])++s, "")) (\m -> ("/"++(x:[])++s, m)) o}
 
 --atoken :: String -> Token
 atoken = 
@@ -84,10 +93,13 @@ atoken =
      <|> try (do{ x <- keyword; return $ TokenKw x})
      <|> try (do{ x <- commentSLine; return $ TokenComment x})
      <|> try (do{ x <- commentMLine; return $ TokenComment x})
+     <|> try (do{ x <- xmlSTag; return $ TokenXml x})
+     <|> try (do{ x <- xml; return $ TokenXml x})
+     <|> try (do{ x <- regex; return $ TokenRegex x})
      <|> try (do{ x <- operator; return $ TokenOp x})
      <|> try (do{ x <- identifier; return $ TokenIdent x})
-     <|> try (do{ x <- quotedDString; return $ TokenStringLit x})
-     <|> try (do{ x <- quotedSString; return $ TokenStringLit x})
+     <|> try (do{ x <- quotedDString; return $ TokenString x})
+     <|> try (do{ x <- quotedSString; return $ TokenString x})
      <|> try (do{ x <- whiteSpace; return $ TokenWhite x}) 
      <|> try (do{ char '\n'; eof; return TokenEof })
      <|> try (do{ char '\n'; return TokenNl })
@@ -97,21 +109,7 @@ atoken =
 --lexer :: ParsecT String () Identity [Token]
 lexer = many1 (do { p <- getPosition; t <- atoken; return (p, t) })
 
-runLexer :: String -> [(SourcePos, Token)]
-runLexer s = case parse lexer "" s of
+runLexer :: String -> String -> [(SourcePos, Token)]
+runLexer filename s = case parse lexer filename s of
                   Right l -> l
                   Left _ -> []
-
---unknowns t = [ x | x@(_, TokenUnknown a) <- t]
-
---main = print $ runLexer "   12  3.1   3  \n 123 \t\t"
-{-
-main = do args <- getArgs
-          contents <- readFile args!!1
-          let tokens = runLexer contents
-          putStrLn "Unknown Tokens--\n"
-          print $ unknowns tokens
-          putStrLn "\n\nTokenized--"
-          print tokens
--}
---main = putStrLn "test"
