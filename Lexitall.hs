@@ -39,6 +39,7 @@ displayToken tokens t = do putStrLn "Detected Unknown: "
 
 renderTokens lfilter filename = 
     do contents <- readFile filename
+       putStrLn $ "Checking: "++filename
        let tokens = runLexer filename contents
        let ftokens = lfilter tokens
        if null ftokens == False

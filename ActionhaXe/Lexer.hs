@@ -1,16 +1,22 @@
 -- Turn the as3 source into Tokens for parsing
 
-module ActionhaXe.Lexer where
+module ActionhaXe.Lexer (runLexer, LToken, ltokenSource, ltokenLine, ltokenCol, ltokenItem, Token(..), TokenNum(..), keywords, operators) where
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
 import Text.Parsec.Char
 import Text.Parsec.Perm
 import Data.Char
-import Data.List
+import Data.List 
 
 --import Control.Monad.Identity
 
+type LToken = (SourcePos, Token)
+
+ltokenSource (s, i) = sourceName s
+ltokenLine (s, i) = sourceLine s
+ltokenCol (s, i) = sourceColumn s
+ltokenItem (s, i) = i
 
 data TokenNum    = TokenInteger String
                  | TokenDouble String
@@ -32,7 +38,6 @@ data Token =
            | TokenOp String
            | TokenXml String
            | TokenUnknown String
-           | TokenRest String
     deriving (Show, Eq)
 
 keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue", "default",
@@ -128,7 +133,7 @@ atoken =
 --lexer :: ParsecT String () Identity [Token]
 lexer = many1 (do { p <- getPosition; t <- atoken; return (p, t) })
 
-runLexer :: String -> String -> [(SourcePos, Token)]
+runLexer :: String -> String -> [LToken]
 runLexer filename s = case parse lexer filename s of
                   Right l -> l
                   Left _ -> []
