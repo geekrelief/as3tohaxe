@@ -10,18 +10,40 @@ import Control.Monad
 
 format s a = parens (hcat [text (sourceName s), space, int (sourceLine s), colon, int (sourceColumn s) ]) <+> text a
 
+{-
 unknowns ts = [ format s a  | t@(s, TokenUnknown a) <- ts]
 comments ts = [ format s a | t@(s, TokenComment a) <- ts]
 strings ts = [ format s a | t@(s, TokenString a) <- ts]
 xmls ts = [ format s a | t@(s, TokenXml a) <- ts]
 regexs ts = [ format s (r1++"/"++r2) | t@(s, TokenRegex (r1,r2)) <- ts]
+-}
+
+unknowns ts = [ t  | t@(s, TokenUnknown a) <- ts]
+comments ts = [ t | t@(s, TokenComment a) <- ts]
+strings ts = [ t | t@(s, TokenString a) <- ts]
+xmls ts = [ t | t@(s, TokenXml a) <- ts]
+regexs ts = [ t | t@(s, TokenRegex (r1,r2)) <- ts]
+
+inRange (s, _) (t, _) = linet > lines - 3 && linet < lines + 3
+    where
+           linet = sourceLine t
+           lines = sourceLine s
+
+getContext ftoken tokens = filter (\t -> inRange ftoken t) tokens
+
+displayToken tokens t = do putStrLn "Detected Unknown: "
+                           print t
+                           putStrLn "Context --"
+                           mapM_ print $ getContext t tokens
 
 renderTokens lfilter filename = 
     do contents <- readFile filename
        let tokens = runLexer filename contents
-       if null tokens == False
+       let ftokens = lfilter tokens
+       if null ftokens == False
            then do putStrLn $ "Detected: "++filename
-                   putStrLn $ render $ hcat $ punctuate (text "\n") $ lfilter tokens
+                  -- putStrLn $ render $ hcat $ punctuate (text "\n") $ ftokens
+                   mapM_ (displayToken tokens) ftokens
            else return ()
 
 isFile f = do t <- doesFileExist f
@@ -39,11 +61,12 @@ getASFiles dir = do contents <- getDirectoryContents dir
                         then return $ concat childAsFiles
                         else return $ concat (asfiles: childAsFiles)
 
-{-
+
 main = do args <- getArgs
           asFiles <- getASFiles (args!!0)
           mapM_ (renderTokens unknowns) asFiles
--}
 
+{-
 main = do args <- getArgs
           renderTokens regexs $ args!!0
+-}

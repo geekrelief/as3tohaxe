@@ -23,7 +23,7 @@ data Token =
            | TokenNum TokenNum
            | TokenIdent String
            | TokenString String
-           | TokenNl
+           | TokenNl String
            | TokenRegex (String, String)
            | TokenEof
            | TokenKw String
@@ -67,10 +67,14 @@ operator' []     = fail " failed "
 
 operator = operator' $ sortByLength operators
 
+nl = do{ try (string "\r\n"); return "\r\n" }
+ <|> do{ try (char '\n'); return "\n" }
+ <|> do{ try (char '\r'); return "\r" }
+
 quotedDString = do{ s <- between (char '"') (char '"') (many (satisfy (\c -> isPrint c && c /= '"'))); return $ "\"" ++ s ++ "\""}
 quotedSString = do{ s <- between (char '\'') (char '\'') (many (satisfy (\c -> isPrint c && c /= '\''))); return $ "'" ++ s ++ "'"}
 
-commentSLine = do{ s <- between (string "//") newline (many (satisfy(\c -> c /= '\n'))); i <- getInput; setInput $ "\n"++i ; return $ "//"++s}
+commentSLine = do{ string "//"; s <- manyTill anyChar (lookAhead nl); return $ "//"++s}
 commentMLine = do{ string "/*"; s <- manyTill anyChar (try(string "*/")); return $ "/*"++s++"*/" }
 
 xml = do{ char '<'; t <- many1 (satisfy (\c -> isPrint c && c /= '>')); char '>'; x <- manyTill anyChar (try (string $ "</"++t++">")); return $ "<"++t++">"++x++"</"++t++">"}
@@ -79,12 +83,16 @@ xmlSTag = do{ char '<'; t <- manyTill (satisfy (\c -> isPrint c && c /= '/' && c
 
 --type Parser = Parsec Token ()
 whiteSpace :: Parser String
-whiteSpace = many1 (satisfy (\c -> isSpace c && c /= '\n'))
+whiteSpace = many1 (satisfy (\c -> c == ' ' || c == '\t'))
+
+escapedAnyChar = try(do{ char '\\'; c <- anyChar; return $ "\\"++[c]})
+             <|> do{ c <- anyChar; return [c]}
 
 --regexOptions :: Parser String
 regexOptions = permute (catter <$?> ('_', char 'g') <|?> ('_', char 'i') <|?> ('_', char 'm') <|?> ('_', char 's') <|?> ('_', char 'x'))
     where catter g i m s x =  filter (\c -> c /= '_') [g, i, m, s, x]
-regex = do { char '/'; x <- noneOf "/*"; s <- manyTill anyChar (try (do {noneOf "\\"; char '/'})); o <- optionMaybe regexOptions; return $ maybe (("/"++(x:[])++s, "")) (\m -> ("/"++(x:[])++s, m)) o}
+regex = do { char '/'; s <- manyTill escapedAnyChar (char '/'); o <- optionMaybe regexOptions; return $ maybe (("/"++(concat s)++"/", "")) (\m -> ("/"++(concat s)++"/", m)) o}
+--regex = do { char '/'; x <- noneOf "/*"; s <- manyTill anyChar (try (do {noneOf "\\"; char '/'})); o <- optionMaybe regexOptions; return $ maybe (("/"++(x:[])++s, "")) (\m -> ("/"++(x:[])++s, m)) o}
 
 --atoken :: String -> Token
 atoken = 
@@ -101,8 +109,8 @@ atoken =
      <|> try (do{ x <- quotedDString; return $ TokenString x})
      <|> try (do{ x <- quotedSString; return $ TokenString x})
      <|> try (do{ x <- whiteSpace; return $ TokenWhite x}) 
-     <|> try (do{ char '\n'; eof; return TokenEof })
-     <|> try (do{ char '\n'; return TokenNl })
+     <|> try (do{ nl; eof; return TokenEof })
+     <|> try (do{ x <- nl; return $ TokenNl x })
      <|> try (do{ x <- anyToken; return $ TokenUnknown $ x:[]})
 
 
