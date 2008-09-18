@@ -6,6 +6,7 @@ import System.Environment (getArgs)
 import Text.PrettyPrint
 import System.Directory
 import Data.Char
+import Data.List
 import Control.Monad
 
 format s a = parens (hcat [text (sourceName s), space, int (sourceLine s), colon, int (sourceColumn s) ]) <+> text a
@@ -63,10 +64,12 @@ getASFiles dir = do contents <- getDirectoryContents dir
 
 
 main = do args <- getArgs
-          asFiles <- getASFiles (args!!0)
-          mapM_ (renderTokens unknowns) asFiles
+          if isSuffixOf ".as" (args!!0)
+              then renderTokens unknowns $ args!!0
+              else do asFiles <- getASFiles (args!!0)
+                      mapM_ (renderTokens unknowns) asFiles
 
 {-
 main = do args <- getArgs
-          renderTokens regexs $ args!!0
+          renderTokens unknowns $ args!!0
 -}

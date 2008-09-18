@@ -12,8 +12,10 @@ import Data.List
 --import Control.Monad.Identity
 
 
-data TokenNum    = TokenInteger Integer
-                 | TokenDouble Double
+data TokenNum    = TokenInteger String
+                 | TokenDouble String
+                 | TokenOctal String
+                 | TokenHex String
     deriving (Show, Eq)
 
 
@@ -33,7 +35,7 @@ data Token =
            | TokenRest String
     deriving (Show, Eq)
 
-keywords = [ "as", "break", "case", "catch", "class", "const", "continue", "default",
+keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue", "default",
              "delete", "do", "else", "extends", "false", "finally", "for", "function", "if",
              "implements", "internal", "is", "native", "new", "null", "package", "private",
              "protected", "public", "return", "super", "switch", "this", "throw", "to",
@@ -51,66 +53,75 @@ operators = [ ".", "[", "]", "(", ")", "@", "::", "..", "{", "}",
               ">>>=", "&=", "^=", "|=", ",", ":", ";"
             ]
 
-keyword :: Parser String
-keyword = do { x <- many1 identChar; if (elem x $ keywords) then return x else unexpected "keyword" }
+--keyword :: Parser String
+keyword = do { x <- many1 identChar; if (elem x $ keywords) then return (TokenKw x) else unexpected "keyword" }
 
-identifier :: Parser String
-identifier = do{ x <- many1 identChar; return x }
+--identifier :: Parser String
+identifier = do{ x<- (satisfy (\c -> isAlpha c || c == '_' || c == '$')); x' <- many identChar; return $ TokenIdent $ [x]++x' }
 
 identChar = satisfy (\c -> isAlphaNum c || c == '_' || c == '$')
 
 sortByLength = sortBy (\x y -> compare (length y) (length x))
 
-operator' (o:os) = try (do{ s <- string o; return s })
+operator' (o:os) = try (do{ s <- string o; return $ TokenOp s })
                <|> operator' os
 operator' []     = fail " failed "
 
 operator = operator' $ sortByLength operators
 
-nl = do{ try (string "\r\n"); return "\r\n" }
+--whiteSpace :: Parser String
+whiteSpace = many1 (satisfy (\c -> c == ' ' || c == '\t'))
+
+anyCharButNl = do{ c <- (satisfy(\c-> isPrint c && c /= '\r' && c /= '\n')); return c }
+
+escapedAnyChar = try(do{ char '\\'; c <- anyCharButNl; return $ "\\"++[c]})
+             <|> do{ c <- anyCharButNl; return [c]}
+
+nl' = do{ try (string "\r\n"); return "\r\n" }
  <|> do{ try (char '\n'); return "\n" }
  <|> do{ try (char '\r'); return "\r" }
 
-quotedDString = do{ s <- between (char '"') (char '"') (many (satisfy (\c -> isPrint c && c /= '"'))); return $ "\"" ++ s ++ "\""}
-quotedSString = do{ s <- between (char '\'') (char '\'') (many (satisfy (\c -> isPrint c && c /= '\''))); return $ "'" ++ s ++ "'"}
+nl = do{ x <- nl'; return $ TokenNl x }
 
-commentSLine = do{ string "//"; s <- manyTill anyChar (lookAhead nl); return $ "//"++s}
-commentMLine = do{ string "/*"; s <- manyTill anyChar (try(string "*/")); return $ "/*"++s++"*/" }
+endof = do{ nl'; eof; return TokenEof }
 
-xml = do{ char '<'; t <- many1 (satisfy (\c -> isPrint c && c /= '>')); char '>'; x <- manyTill anyChar (try (string $ "</"++t++">")); return $ "<"++t++">"++x++"</"++t++">"}
+quotedDString = do{ char '"'; s <- manyTill escapedAnyChar (char '"'); return $ TokenString $ "\"" ++ (concat s) ++ "\""}
+quotedSString = do{ char '\''; s <- manyTill escapedAnyChar (char '\''); return $ TokenString $ "'" ++ (concat s) ++ "'"}
 
-xmlSTag = do{ char '<'; t <- manyTill (satisfy (\c -> isPrint c && c /= '/' && c /= '>')) (string "/>"); return $ "<"++t++"/>"}
+commentSLine = do{ string "//"; s <- manyTill anyChar (lookAhead nl); return $ TokenComment $ "//"++s}
+commentMLine = do{ string "/*"; s <- manyTill anyChar (try(string "*/")); return $ TokenComment $ "/*"++s++"*/" }
+
+xml = do{ char '<'; t <- many1 (satisfy (\c -> isPrint c && c /= '>')); char '>'; x <- manyTill anyChar (try (string $ "</"++t++">")); return $ TokenXml $ "<"++t++">"++x++"</"++t++">"}
+
+xmlSTag = do{ char '<'; t <- manyTill (satisfy (\c -> isPrint c && c /= '/' && c /= '>')) (string "/>"); return $ TokenXml $ "<"++t++"/>"}
 
 --type Parser = Parsec Token ()
-whiteSpace :: Parser String
-whiteSpace = many1 (satisfy (\c -> c == ' ' || c == '\t'))
-
-escapedAnyChar = try(do{ char '\\'; c <- anyChar; return $ "\\"++[c]})
-             <|> do{ c <- anyChar; return [c]}
-
 --regexOptions :: Parser String
 regexOptions = permute (catter <$?> ('_', char 'g') <|?> ('_', char 'i') <|?> ('_', char 'm') <|?> ('_', char 's') <|?> ('_', char 'x'))
     where catter g i m s x =  filter (\c -> c /= '_') [g, i, m, s, x]
-regex = do { char '/'; s <- manyTill escapedAnyChar (char '/'); o <- optionMaybe regexOptions; return $ maybe (("/"++(concat s)++"/", "")) (\m -> ("/"++(concat s)++"/", m)) o}
---regex = do { char '/'; x <- noneOf "/*"; s <- manyTill anyChar (try (do {noneOf "\\"; char '/'})); o <- optionMaybe regexOptions; return $ maybe (("/"++(x:[])++s, "")) (\m -> ("/"++(x:[])++s, m)) o}
+regex = do { char '/'; notFollowedBy (char ' '); s <- manyTill escapedAnyChar (char '/'); o <- optionMaybe regexOptions; return $ maybe (TokenRegex ("/"++(concat s)++"/", "")) (\m -> TokenRegex ("/"++(concat s)++"/", m)) o}
+
+number = try (do{ char '0'; char 'x'; x <- many1 hexDigit; return $ TokenNum $ TokenHex $ "0x"++x})
+     <|> try (do{ char '0'; x <- many1 octDigit; return $ TokenNum $ TokenOctal $ "0"++x})
+     <|> try (do{ x <- many1 digit; char '.'; y <- many1 digit; return $ TokenNum $ TokenDouble $  x++"."++y  })
+     <|> try (do{ x <- many1 digit; return $ TokenNum $ TokenInteger $ x })
 
 --atoken :: String -> Token
 atoken = 
-         try (do{ x <- many1 digit; char '.'; y <- many1 digit; return $ TokenNum $ TokenDouble $ read (x++"."++y)  })
-     <|> try (do{ x <- many1 digit; return $ TokenNum $ TokenInteger $ read x })
-     <|> try (do{ x <- keyword; return $ TokenKw x})
-     <|> try (do{ x <- commentSLine; return $ TokenComment x})
-     <|> try (do{ x <- commentMLine; return $ TokenComment x})
-     <|> try (do{ x <- xmlSTag; return $ TokenXml x})
-     <|> try (do{ x <- xml; return $ TokenXml x})
-     <|> try (do{ x <- regex; return $ TokenRegex x})
-     <|> try (do{ x <- operator; return $ TokenOp x})
-     <|> try (do{ x <- identifier; return $ TokenIdent x})
-     <|> try (do{ x <- quotedDString; return $ TokenString x})
-     <|> try (do{ x <- quotedSString; return $ TokenString x})
+         try (do{ x <- keyword; return x})
+     <|> try (do{ x <- commentSLine; return x})
+     <|> try (do{ x <- commentMLine; return x})
+     <|> try (do{ x <- xmlSTag; return x})
+     <|> try (do{ x <- xml; return x})
+     <|> try (do{ x <- regex; return x})
+     <|> try (do{ x <- operator; return x})
+     <|> try (do{ x <- identifier; return x})
+     <|> try (do{ x <- quotedDString; return x})
+     <|> try (do{ x <- quotedSString; return x})
      <|> try (do{ x <- whiteSpace; return $ TokenWhite x}) 
-     <|> try (do{ nl; eof; return TokenEof })
-     <|> try (do{ x <- nl; return $ TokenNl x })
+     <|> try (do{ x <- number; return x})
+     <|> try (do{ x <- endof; return x })
+     <|> try (do{ x <- nl; return x })
      <|> try (do{ x <- anyToken; return $ TokenUnknown $ x:[]})
 
 

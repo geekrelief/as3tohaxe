@@ -17,6 +17,6 @@ main = do args <- getArgs
           contents <- readFile filename
           let tokens = runLexer filename contents
           putStrLn $ render $ hcat $ punctuate (text "\n") $ unknowns tokens
---          putStrLn "\n\nTokenized--"
---          print tokens
+          putStrLn "\n\nTokenized--"
+          print tokens
 
