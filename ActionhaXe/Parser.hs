@@ -6,24 +6,46 @@ import ActionhaXe.Lexer
 import ActionhaXe.Prim
 import Text.Parsec
 import Text.Parsec.Combinator
+import Text.Parsec.Pos (lookAhead)
 
-type Parser = Parsec [Token] ()
+type TList = [Token]
+type Parser = Parsec TList ()
 
-data ASTNode = NodeProgram ASTNode
-             | NodePackage (String, ASTNode)
-             | NodeTokenList [Token]
-             | NodeFailure
+type Identifier = (TList, TList)  -- qualifier, name
+
+data TokenBlock = TBtok CToken
+                | TBblock Block
+    deriving (Show, Eq)
+
+data Block = Block CToken CToken
+    deriving (Show, Eq)
+
+data Package = PackageNamed CToken CToken Block
+             | Package CToken Block
+    deriving (Show, Eq)
+
+data AST = Program Package
+         | TokenList TList
+         | Failure
     deriving (Show, Eq)
 
 
-program :: Parser ASTNode
-program = try( do{ x <- package; return x} )
-      <|> do{ x <- many anytok; return $ NodeTokenList x} -- should always succeed
+program :: Parser AST
+program = try( do{ x <- package; return $ Program x} )
+      <|> do{ x <- many anytok; return $ TokenList x} -- should always succeed
           <?> "Unknown Error"
 
-package = do{ p <- kw "package"; x <- many anytok;  return $ NodePackage ("", (NodeTokenList x)) }
+package = try( do{ p <- kw "package"; b <- block; return $ Package p {- i -} b })
+      <|> try( do{ p <- kw "package"; i <- ident; b <- block; return $ PackageNamed p i b})
 
-runParser :: String -> [Token] -> ASTNode
+block = do{ l <- op "{"; {- x <- inBlock; -} r <- op "}"; return $ Block l {- x-} r } 
+
+{-inBlock = try(do{ lookAhead( op "}"); return None })
+      <|> try(do{ b <- block; return b })
+-}
+
+
+runParser :: String -> [Token] -> AST
 runParser filename ts = case parse program filename ts of
-                             Right a -> NodeProgram a
-                             Left _ -> NodeFailure
+                             Right a -> a
+                             Left _ -> Failure

@@ -31,7 +31,6 @@ data TokenType =
            | TokenString String
            | TokenNl String
            | TokenRegex (String, String)
-           | TokenEof
            | TokenKw String
            | TokenOp String
            | TokenXml String
@@ -70,7 +69,8 @@ operator' []     = fail " failed "
 
 operator = operator' $ sortByLength operators
 
-whiteSpace = many1 (satisfy (\c -> c == ' ' || c == '\t'))
+simpleSpace = many1 (satisfy (\c -> c == ' ' || c == '\t'))
+whiteSpace = do{ x <- many1 ( try( simpleSpace ) <|>  nl' ); return $ TokenWhite $ concat x}
 
 anyCharButNl = do{ c <- (satisfy(\c-> isPrint c && c /= '\r' && c /= '\n')); return c }
 
@@ -81,9 +81,7 @@ nl' = do{ try (string "\r\n"); return "\r\n" }
  <|> do{ try (char '\n'); return "\n" }
  <|> do{ try (char '\r'); return "\r" }
 
-nl = do{ x <- nl'; return $ TokenNl x }
-
-endof = do{ nl'; eof; return TokenEof }
+nl = do{ x <- nl'; return $ TokenNl x}
 
 quotedDString = do{ char '"'; s <- manyTill escapedAnyChar (char '"'); return $ TokenString $ "\"" ++ (concat s) ++ "\""}
 quotedSString = do{ char '\''; s <- manyTill escapedAnyChar (char '\''); return $ TokenString $ "'" ++ (concat s) ++ "'"}
@@ -116,9 +114,7 @@ atoken =
      <|> try (do{ x <- identifier; return x})
      <|> try (do{ x <- quotedDString; return x})
      <|> try (do{ x <- quotedSString; return x})
-     <|> try (do{ x <- whiteSpace; return $ TokenWhite x}) 
-     <|> try (do{ x <- endof; return x })
-     <|> try (do{ x <- nl; return x })
+     <|> try (do{ x <- whiteSpace; return x}) 
      <|> try (do{ x <- anyToken; return $ TokenUnknown $ x:[]})
 
 
