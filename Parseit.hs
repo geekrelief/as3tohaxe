@@ -10,7 +10,7 @@ import System.Environment (getArgs)
 main = do args <- getArgs
           let filename = args!!0
           contents <- readFile filename
-          let tokens = runLexer filename contents
+          let tokens = runLexer "" contents
           let ast = runParser filename tokens
           print ast
 

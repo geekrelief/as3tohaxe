@@ -16,7 +16,7 @@ mytoken test = token showTok posFromTok testTok
                  posFromTok (pos, t) = pos
                  testTok t           = test t
 
-anytok = mytoken $ \t -> Just t
+anytok' = mytoken $ \t -> Just [t]
 
 white = mytoken $ \t -> case tokenItem t of
                             TokenWhite x -> Just t
@@ -30,11 +30,7 @@ com = mytoken $ \t -> case tokenItem t of
                               TokenComment x -> Just t
                               _ -> Nothing
 
-eof' = mytoken $ \t -> case tokenItem t of
-                           TokenEof -> Just t
-                           _ -> Nothing 
-
-whiteSpace = many (white <|> nl <|> com <|> eof') 
+whiteSpace = many (white <|> nl <|> com)
 
 mylexeme p = do{ x <- p; w <- whiteSpace; return $ CToken x w}
 
@@ -71,6 +67,4 @@ op o = mylexeme $ op' o
 
 ident = mylexeme $ id'
 
-oneOf ts = mytoken $ \t -> case (elem t ts) of
-                               True -> Just t
-                               _ -> Nothing
+anytok = mylexeme $ anytok'

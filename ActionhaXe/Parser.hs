@@ -6,18 +6,17 @@ import ActionhaXe.Lexer
 import ActionhaXe.Prim
 import Text.Parsec
 import Text.Parsec.Combinator
-import Text.Parsec.Pos (lookAhead)
 
 type TList = [Token]
 type Parser = Parsec TList ()
 
 type Identifier = (TList, TList)  -- qualifier, name
 
-data TokenBlock = TBtok CToken
+data TokenBlock = TBtok [CToken]
                 | TBblock Block
     deriving (Show, Eq)
 
-data Block = Block CToken CToken
+data Block = Block CToken [TokenBlock] CToken
     deriving (Show, Eq)
 
 data Package = PackageNamed CToken CToken Block
@@ -25,7 +24,7 @@ data Package = PackageNamed CToken CToken Block
     deriving (Show, Eq)
 
 data AST = Program Package
-         | TokenList TList
+         | TokenList [CToken]
          | Failure
     deriving (Show, Eq)
 
@@ -38,11 +37,12 @@ program = try( do{ x <- package; return $ Program x} )
 package = try( do{ p <- kw "package"; b <- block; return $ Package p {- i -} b })
       <|> try( do{ p <- kw "package"; i <- ident; b <- block; return $ PackageNamed p i b})
 
-block = do{ l <- op "{"; {- x <- inBlock; -} r <- op "}"; return $ Block l {- x-} r } 
+block = do{ l <- op "{"; x <- inBlock; r <- op "}"; return $ Block l x r } 
 
-{-inBlock = try(do{ lookAhead( op "}"); return None })
-      <|> try(do{ b <- block; return b })
--}
+inBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ b <- block; return [TBblock b] })
+      <|> try(do{ x <- manyTill anytok (try(lookAhead (op "}")) <|> try(lookAhead (op "{"))); i <- inBlock; return $ [TBtok x]++i })
+--      <|> try(do{ x <- manyTill anytok (lookAhead (op "{")); b<- block; return $ [TBtok x] ++ [TBblock b] })
 
 
 runParser :: String -> [Token] -> AST
