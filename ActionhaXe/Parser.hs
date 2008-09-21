@@ -42,8 +42,6 @@ block = do{ l <- op "{"; x <- inBlock; r <- op "}"; return $ Block l x r }
 inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; return [TBblock b] })
       <|> try(do{ x <- manyTill anytok (try(lookAhead (op "}")) <|> try(lookAhead (op "{"))); i <- inBlock; return $ [TBtok x]++i })
---      <|> try(do{ x <- manyTill anytok (lookAhead (op "{")); b<- block; return $ [TBtok x] ++ [TBblock b] })
-
 
 runParser :: String -> [Token] -> AST
 runParser filename ts = case parse program filename ts of

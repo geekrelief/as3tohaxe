@@ -65,6 +65,18 @@ xml' = mytoken $ \t -> case tokenItem t of
 kw k = mylexeme $ kw' k
 op o = mylexeme $ op' o
 
-ident = mylexeme $ id'
+sepByI1 :: AsParser [a] -> AsParser [a] -> AsParser [a]
+sepByI1 p sep = do{ x <- p
+                 ; xs <- many (do{ s <- sep; i<- p; return (s++i)})
+                 ; return $ concat (x:xs)
+                 }
+
+ident' = do{ n <- sepBy1 id' (op' "."); return (concat n)}
+-- ident : qualified identifier
+ident = mylexeme $ ident'
+-- sident : qualified identifier with possible * at end
+sident = mylexeme $ try( do{ n <- sepEndBy1 id' (op' "."); o <- op' "*"; return $ (concat n) ++ o}) <|> ident'
+-- nident : identifier qualified with namespace
+nident = mylexeme $ do{ q<- try(do{ n'<- ident'; c <- op' "::"; return $ n'++c }) <|> return []; n <- ident'; return $ q++n } 
 
 anytok = mylexeme $ anytok'
