@@ -3,11 +3,26 @@ module ActionhaXe.Prim where
 import ActionhaXe.Lexer
 import Text.Parsec
 import Text.Parsec.Prim
+import Data.Map (Map)
 
-type AsParser = Parsec [Token] ()
+type TList = [Token]
+type Identifier = (TList, TList)
+type AsState = [(Map String AsType)] -- identifier and type -- type can change as file is parsed
+type AsParser = Parsec TList AsState
+
+data AsType = AsTypeVoid
+            | AsTypeBoolean
+            | AsTypeNumber
+            | AsTypeString
+            | AsTypeDynamic
+            | AsTypeObject
+            | AsTypeArray AsType
+            | AsTypeUserDefined 
+            | AsTypeUnknown
+    deriving (Show, Eq)
+
 data CToken = CToken [Token] [Token]  -- compound token with a list for an entity and whitespace
     deriving (Show, Eq)
---            | CSToken Token [Token]   -- simple compound token is this necessary?
 
 mytoken :: (Token -> Maybe a) -> AsParser a
 mytoken test = token showTok posFromTok testTok

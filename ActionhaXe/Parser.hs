@@ -6,44 +6,54 @@ import ActionhaXe.Lexer
 import ActionhaXe.Prim
 import Text.Parsec
 import Text.Parsec.Combinator
+import Data.Map (Map)
+import qualified Data.Map as Map
 
-type TList = [Token]
-type Parser = Parsec TList ()
-
-type Identifier = (TList, TList)  -- qualifier, name
-
-data TokenBlock = TBtok [CToken]
-                | TBblock Block
+data BlockItem = Btok [CToken]
+                | Block CToken [BlockItem] CToken
+                | ImportDecl CToken CToken
     deriving (Show, Eq)
 
-data Block = Block CToken [TokenBlock] CToken
-    deriving (Show, Eq)
-
-data Package = PackageNamed CToken CToken Block
-             | Package CToken Block
-    deriving (Show, Eq)
-
-data AST = Program Package
+data AST = Program Package AsState
          | TokenList [CToken]
          | Failure
     deriving (Show, Eq)
 
+data Package = PackageNamed CToken CToken BlockItem
+             | Package CToken BlockItem
+    deriving (Show, Eq)
 
-program :: Parser AST
-program = try( do{ x <- package; return $ Program x} )
+{-
+data Block = Block CToken [BlockItem] CToken
+    deriving (Show, Eq)
+
+data ImportDecl = ImportDecl CToken CToken
+    deriving (Show, Eq)
+-}
+
+program :: AsParser AST
+program = try( do{ x <- package; a <- getState; return $ Program x a} )
       <|> do{ x <- many anytok; return $ TokenList x} -- should always succeed
           <?> "Unknown Error"
 
-package = try( do{ p <- kw "package"; b <- block; return $ Package p {- i -} b })
+package = try( do{ p <- kw "package"; b <- block; return $ Package p b })
       <|> try( do{ p <- kw "package"; i <- ident; b <- block; return $ PackageNamed p i b})
+
+importDecl = do{ k <- kw "import"; s <- sident; return $ ImportDecl k s}
 
 block = do{ l <- op "{"; x <- inBlock; r <- op "}"; return $ Block l x r } 
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
-      <|> try(do{ b <- block; return [TBblock b] })
-      <|> try(do{ x <- manyTill anytok (try(lookAhead (op "}")) <|> try(lookAhead (op "{"))); i <- inBlock; return $ [TBtok x]++i })
+      <|> try(do{ b <- block; return [b] })
+      <|> try(do{ x <- manyTill anytok (try(lookAhead (op "}")) <|> try(lookAhead (op "{"))); i <- inBlock; return $ [Btok x]++i })
 
-runParser :: String -> [Token] -> AST
-runParser filename ts = case parse program filename ts of
-                             Right a -> a
-                             Left _ -> Failure
+-- State functions
+initSlt :: AsState
+initSlt = [Map.empty] -- this is the global state
+
+
+
+parseTokens :: String -> [Token] -> AST
+parseTokens filename ts = case runParser program initSlt filename ts of
+                                   Right a -> a
+                                   Left _ -> Failure
