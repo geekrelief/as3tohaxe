@@ -9,51 +9,34 @@ import Text.Parsec.Combinator
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-data BlockItem = Btok [CToken]
-                | Block CToken [BlockItem] CToken
-                | ImportDecl CToken CToken
-    deriving (Show, Eq)
+data BlockItem =  Tok        CToken
+                | Block      CToken [BlockItem] CToken
+                | ImportDecl CToken CToken Semi
+    deriving (Show)
 
-data AST = Program Package AsState
-         | TokenList [CToken]
-         | Failure
-    deriving (Show, Eq)
+data Ast = Program Package AsState
+    deriving (Show)
 
-data Package = PackageNamed CToken CToken BlockItem
-             | Package CToken BlockItem
-    deriving (Show, Eq)
+data Package = Package CToken (Maybe CToken) BlockItem
+    deriving (Show)
 
-{-
-data Block = Block CToken [BlockItem] CToken
-    deriving (Show, Eq)
+program :: AsParser Ast
+program = do{ x <- package; a <- getState; return $ Program x a}
 
-data ImportDecl = ImportDecl CToken CToken
-    deriving (Show, Eq)
--}
+package = do{ p <- kw "package"; i <- optionMaybe(ident); b <- block; return $ Package p i b }
 
-program :: AsParser AST
-program = try( do{ x <- package; a <- getState; return $ Program x a} )
-      <|> do{ x <- many anytok; return $ TokenList x} -- should always succeed
-          <?> "Unknown Error"
+importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 
-package = try( do{ p <- kw "package"; b <- block; return $ Package p b })
-      <|> try( do{ p <- kw "package"; i <- ident; b <- block; return $ PackageNamed p i b})
-
-importDecl = do{ k <- kw "import"; s <- sident; return $ ImportDecl k s}
-
-block = do{ l <- op "{"; x <- inBlock; r <- op "}"; return $ Block l x r } 
+block = do{ l <- op "{"; x <- inBlock; r <- op "}"; return $ Block l x r }
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; return [b] })
-      <|> try(do{ x <- manyTill anytok (try(lookAhead (op "}")) <|> try(lookAhead (op "{"))); i <- inBlock; return $ [Btok x]++i })
+      <|> try(do{ x <- importDecl; i <- inBlock; return $ [x]++ i})
+      <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 -- State functions
 initSlt :: AsState
-initSlt = [Map.empty] -- this is the global state
+initSlt = [Map.empty] -- this is the global state, Map Definition DefInfo
 
-
-
-parseTokens :: String -> [Token] -> AST
-parseTokens filename ts = case runParser program initSlt filename ts of
-                                   Right a -> a
-                                   Left _ -> Failure
+parseTokens :: String -> [Token] -> Either ParseError Ast
+parseTokens filename ts = runParser program initSlt filename ts

@@ -5,9 +5,13 @@ import Text.Parsec
 import Text.Parsec.Prim
 import Data.Map (Map)
 
+type Name = String
 type TList = [Token]
-type Identifier = (TList, TList)
-type AsState = [(Map String AsType)] -- identifier and type -- type can change as file is parsed
+type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
+
+type Semi = Maybe CToken
+
+type AsState = [(Map AsDef AsDefInfo)] 
 type AsParser = Parsec TList AsState
 
 data AsType = AsTypeVoid
@@ -17,12 +21,29 @@ data AsType = AsTypeVoid
             | AsTypeDynamic
             | AsTypeObject
             | AsTypeArray AsType
-            | AsTypeUserDefined 
+            | AsTypeUserDefined CToken
             | AsTypeUnknown
-    deriving (Show, Eq)
+    deriving (Show)
 
-data CToken = CToken [Token] [Token]  -- compound token with a list for an entity and whitespace
-    deriving (Show, Eq)
+
+-- Symbol Lookup key
+data AsDef = DefPackage   Name
+           | DefClass     Name
+           | DefInterface Name
+           | DefFunction  Name  -- anonymous functions are not referenced
+           | DefVar       Name  -- can be for constants too
+           | DefNamespace Name
+    deriving (Show)
+
+type Attribute = String 
+-- Symbol Lookup value
+data AsDefInfo = DiNone             --
+               | DiClass    [Attribute] (Maybe AsDef) (Maybe [AsDef]) -- attributes, extends, implements
+               | DiFunction [Attribute]
+               | DiVar      AsType
+    deriving (Show)
+
+
 
 mytoken :: (Token -> Maybe a) -> AsParser a
 mytoken test = token showTok posFromTok testTok
@@ -47,7 +68,7 @@ com = mytoken $ \t -> case tokenItem t of
 
 whiteSpace = many (white <|> nl <|> com)
 
-mylexeme p = do{ x <- p; w <- whiteSpace; return $ CToken x w}
+mylexeme p = do{ x <- p; w <- whiteSpace; return (x, w)}
 
 num' = mytoken $ \t -> case tokenItem t of
                           TokenNum x -> Just t
@@ -95,3 +116,5 @@ sident = mylexeme $ try( do{ n <- sepEndBy1 id' (op' "."); o <- op' "*"; return 
 nident = mylexeme $ do{ q<- try(do{ n'<- ident'; c <- op' "::"; return $ n'++c }) <|> return []; n <- ident'; return $ q++n } 
 
 anytok = mylexeme $ anytok'
+
+maybeSemi = optionMaybe $ op ";"

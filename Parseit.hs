@@ -11,6 +11,6 @@ main = do args <- getArgs
           let filename = args!!0
           contents <- readFile filename
           let tokens = runLexer "" contents
-          let ast = parseTokens filename tokens
-          print ast
-
+          case parseTokens filename tokens of
+              Right ast -> print ast
+              Left err  -> print err
