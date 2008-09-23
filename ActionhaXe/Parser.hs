@@ -6,8 +6,8 @@ import ActionhaXe.Lexer
 import ActionhaXe.Prim
 import Text.Parsec
 import Text.Parsec.Combinator
-import Data.Map (Map)
-import qualified Data.Map as Map
+
+type Semi = Maybe CToken
 
 data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
@@ -25,18 +25,14 @@ program = do{ x <- package; a <- getState; return $ Program x a}
 
 package = do{ p <- kw "package"; i <- optionMaybe(ident); b <- block; return $ Package p i b }
 
-importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
-
-block = do{ l <- op "{"; x <- inBlock; r <- op "}"; return $ Block l x r }
+block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
-      <|> try(do{ b <- block; return [b] })
-      <|> try(do{ x <- importDecl; i <- inBlock; return $ [x]++ i})
+      <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
+      <|> try(do{ x <- importDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
--- State functions
-initSlt :: AsState
-initSlt = [Map.empty] -- this is the global state, Map Definition DefInfo
+importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
-parseTokens filename ts = runParser program initSlt filename ts
+parseTokens filename ts = runParser program initState filename ts

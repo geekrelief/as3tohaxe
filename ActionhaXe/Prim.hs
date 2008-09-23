@@ -3,15 +3,15 @@ module ActionhaXe.Prim where
 import ActionhaXe.Lexer
 import Text.Parsec
 import Text.Parsec.Prim
+
 import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Tree
 
 type Name = String
 type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
 
-type Semi = Maybe CToken
-
-type AsState = [(Map AsDef AsDefInfo)] 
 type AsParser = Parsec TList AsState
 
 data AsType = AsTypeVoid
@@ -21,21 +21,22 @@ data AsType = AsTypeVoid
             | AsTypeDynamic
             | AsTypeObject
             | AsTypeArray AsType
-            | AsTypeUserDefined CToken
+            | AsTypeUserDefined ([Token], [Token])
             | AsTypeUnknown
     deriving (Show)
 
-
+           
 -- Symbol Lookup key
 data AsDef = DefPackage   Name
            | DefClass     Name
            | DefInterface Name
            | DefFunction  Name  -- anonymous functions are not referenced
            | DefVar       Name  -- can be for constants too
-           | DefNamespace Name
+           | DefNamespace Name  
+           | DefNone
     deriving (Show)
 
-type Attribute = String 
+type Attribute = String
 -- Symbol Lookup value
 data AsDefInfo = DiNone             --
                | DiClass    [Attribute] (Maybe AsDef) (Maybe [AsDef]) -- attributes, extends, implements
@@ -44,8 +45,53 @@ data AsDefInfo = DiNone             --
     deriving (Show)
 
 
+data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
+    deriving (Show)
+data AsState = AsState{ curId::Int, path::[Int], scopes::Tree AsStateEl }
+    deriving (Show)
+
+initState :: AsState
+initState = AsState{ curId = 0, path = [0], scopes = newScope 0}
+
+enterScope :: AsParser ()
+enterScope = do x <- getState
+                let c = (1 +) $ curId x
+                let p = (c:) $ path x
+                let s = scopes x
+                let s' = addScope (reverse p) s
+                let x' = x{ curId = c, path = p, scopes = s'}
+                setState x'
+                return ()
+
+newScope :: Int -> Tree AsStateEl
+newScope i = Node{ rootLabel = AsStateEl{ sid = i, scope = Map.empty}, subForest = []}
+
+addScope :: [Int] -> Tree AsStateEl -> Tree AsStateEl
+addScope (p:ps) t = t{ subForest = addScope' ps (subForest t)}
+
+addScope' :: [Int] -> Forest AsStateEl -> Forest AsStateEl
+addScope' (p:[]) [] = [newScope p]
+addScope' path@(p:ps) (t:ts) = if p == (sid $ rootLabel t) then ((addScope path t):ts) else (t:(addScope' path ts))
+
+exitScope :: AsParser ()
+exitScope = do x <- getState
+               let p = tail $ path x
+               let x' = x{path = p}
+               setState x'
+               return ()
+
+lookupSymbol :: AsParser AsDef
+lookupSymbol = return DefNone
+
+updateSymbol :: AsDef -> AsDefInfo -> AsParser ()
+updateSymbol d di = do x <- getState
+                       setState x
+                       return ()
+
+-- basic parsers
 
 mytoken :: (Token -> Maybe a) -> AsParser a
+
 mytoken test = token showTok posFromTok testTok
              where
                  showTok (pos, t)    = show t
