@@ -8,7 +8,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Tree
 
-type Name = String
+type Name = CToken
 type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
 
@@ -23,7 +23,7 @@ data AsType = AsTypeVoid
             | AsTypeArray AsType
             | AsTypeUserDefined ([Token], [Token])
             | AsTypeUnknown
-    deriving (Show)
+    deriving (Show, Eq, Ord)
 
            
 -- Symbol Lookup key
@@ -34,7 +34,7 @@ data AsDef = DefPackage   Name
            | DefVar       Name  -- can be for constants too
            | DefNamespace Name  
            | DefNone
-    deriving (Show)
+    deriving (Show, Eq, Ord)
 
 type Attribute = String
 -- Symbol Lookup value
@@ -42,8 +42,9 @@ data AsDefInfo = DiNone             --
                | DiClass    [Attribute] (Maybe AsDef) (Maybe [AsDef]) -- attributes, extends, implements
                | DiFunction [Attribute]
                | DiVar      AsType
-    deriving (Show)
+    deriving (Show, Eq, Ord)
 
+type AsDefTuple = (AsDef, AsDefInfo)
 
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
@@ -83,10 +84,30 @@ exitScope = do x <- getState
 lookupSymbol :: AsParser AsDef
 lookupSymbol = return DefNone
 
-updateSymbol :: AsDef -> AsDefInfo -> AsParser ()
-updateSymbol d di = do x <- getState
-                       setState x
-                       return ()
+updateSymbol :: AsDefTuple -> AsParser ()
+updateSymbol d = do x <- getState
+                    x' <- updateS d x
+                    setState x'
+
+updateS :: AsDefTuple -> AsState -> AsParser AsState
+updateS d x = do let p = path x
+                 let s = scopes x
+                 let s' = traverseS (reverse p) s d
+                 return x{scopes = s'}
+
+traverseS :: [Int] -> Tree AsStateEl -> AsDefTuple -> Tree AsStateEl
+traverseS (p:[]) t (d, di) = if p == (sid $ rootLabel t) then t{ rootLabel = AsStateEl { sid = (sid $ rootLabel t), scope = (Map.insert d di (scope $ rootLabel t))}} else fail "dead end"
+traverseS (p:ps) t dt = if p == (sid $ rootLabel t) then t{ subForest = traverseS' ps (subForest t) dt }  else t
+
+-- check the subtrees
+traverseS' :: [Int] -> Forest AsStateEl -> AsDefTuple -> Forest AsStateEl
+traverseS' path@(p:[]) [t] dt = [traverseS path t dt]
+traverseS' path@(p:ps) (t:ts) dt = if p == (sid $ rootLabel t) then ((traverseS ps t dt):ts) else (t:(traverseS' path ts dt))
+
+storePackage :: Maybe CToken -> AsParser ()
+storePackage p = case p of
+                     Just x -> updateSymbol (DefPackage x, DiNone)
+                     Nothing -> return ()
 
 -- basic parsers
 

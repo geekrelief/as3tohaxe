@@ -20,8 +20,7 @@ data TokenNum    = TokenInteger String
                  | TokenDouble String
                  | TokenOctal String
                  | TokenHex String
-    deriving (Show, Eq)
-
+    deriving (Show, Eq, Ord)
 
 data TokenType = 
              TokenWhite String
@@ -35,7 +34,7 @@ data TokenType =
            | TokenOp String
            | TokenXml String
            | TokenUnknown String
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue", "default",
              "delete", "do", "else", "extends", "false", "finally", "for", "function", "if",

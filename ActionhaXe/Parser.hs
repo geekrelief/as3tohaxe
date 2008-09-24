@@ -6,12 +6,14 @@ import ActionhaXe.Lexer
 import ActionhaXe.Prim
 import Text.Parsec
 import Text.Parsec.Combinator
+import Text.Parsec.Perm
 
 type Semi = Maybe CToken
 
 data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi
+                | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem
     deriving (Show)
 
 data Ast = Program Package AsState
@@ -23,16 +25,26 @@ data Package = Package CToken (Maybe CToken) BlockItem
 program :: AsParser Ast
 program = do{ x <- package; a <- getState; return $ Program x a}
 
-package = do{ p <- kw "package"; i <- optionMaybe(ident); b <- block; return $ Package p i b }
+package = do{ p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- block; return $ Package p i b }
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- importDecl; i <- inBlock; return $ [x] ++ i})
+      <|> try(do{ x <- classDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
+
+classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); b <- block; return $ ClassDecl a k i e im b}
+
+classAttributes = permute $ list <$?> (([],[]), (try (kw "public") <|> (kw "internal"))) <|?> (([],[]), kw "static") <|?> (([],[]), kw "dynamic")
+    where list v s d = filter (\a -> fst a /= []) [v,s,d]
+
+classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
+
+classImplements = do{ k <- kw "implements"; s <- sepBy1 (nident) (op ","); return $ k:s}
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
 parseTokens filename ts = runParser program initState filename ts
