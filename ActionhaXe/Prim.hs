@@ -8,9 +8,15 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Tree
 
-type Name = CToken
+type Name = String
 type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
+
+cdata :: CToken -> String
+cdata x = foldr (\t s -> (tokString t) ++ s) "" (fst x)
+    where tokString x = case tokenItem x of
+                            TokenIdent s' -> s'
+                            TokenOp    o  -> o
 
 type AsParser = Parsec TList AsState
 
@@ -106,7 +112,7 @@ traverseS' path@(p:ps) (t:ts) dt = if p == (sid $ rootLabel t) then ((traverseS 
 
 storePackage :: Maybe CToken -> AsParser ()
 storePackage p = case p of
-                     Just x -> updateSymbol (DefPackage x, DiNone)
+                     Just x -> updateSymbol (DefPackage (cdata x), DiNone)
                      Nothing -> return ()
 
 -- basic parsers
