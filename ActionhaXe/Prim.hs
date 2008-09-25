@@ -13,12 +13,16 @@ type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
 
 -- data
-showc :: CToken -> String
-showc x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
+showd :: CToken -> String
+showd x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
 
--- data with whitespace
+-- whitespace
 showw :: CToken -> String
-showw x = foldr (\t s -> (tokenItemS t) ++ s) "" ((fst x)++(snd x))
+showw x = foldr (\t s -> (tokenItemS t) ++ s) "" (snd x)
+
+-- both data and whitespace
+showb :: CToken -> String
+showb x = foldr (\t s -> (tokenItemS t) ++ s) "" ((fst x)++(snd x))
 
 -- the whitespace after the first newline
 shown :: CToken -> String
@@ -122,17 +126,17 @@ traverseS' path@(p:ps) (t:ts) dt = if p == (sid $ rootLabel t) then ((traverseS 
 
 storePackage :: Maybe CToken -> AsParser ()
 storePackage p = case p of
-                     Just x -> updateSymbol (DefPackage (showc x), DiNone)
+                     Just x -> updateSymbol (DefPackage (showd x), DiNone)
                      Nothing -> updateSymbol (DefPackage "//noname", DiNone)
 
 storeClass :: CToken -> AsParser ()
-storeClass c = updateSymbol (DefClass (showc c), DiNone)
+storeClass c = updateSymbol (DefClass (showd c), DiNone)
 
 storeMethod :: CToken -> AsParser ()
-storeMethod m = updateSymbol (DefFunction (showc m), DiNone)
+storeMethod m = updateSymbol (DefFunction (showd m), DiNone)
 
 storeVar :: CToken -> AsType -> AsParser ()
-storeVar v t = updateSymbol (DefVar (showc v), DiVar t)
+storeVar v t = updateSymbol (DefVar (showd v), DiVar t)
 
 -- basic parsers
 

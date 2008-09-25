@@ -87,15 +87,15 @@ defval' = try( do{ x <- kw "null"; return x})
 varDecl = do{ ns <- optionMaybe(ident); k <- kw "var"; n <- nident; c <- op ":"; dt <- datatype; storeVar n dt; return $ VarDecl ns k n c dt}
 
 datatype = try(do{ kw "void";   return AsTypeVoid})
-       <|> try(do{ t <- mid "int";    return $ AsTypeNumber (showc t)})
-       <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (showc t)})
-       <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (showc t)})
+       <|> try(do{ t <- mid "int";    return $ AsTypeNumber (showd t)})
+       <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (showd t)})
+       <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (showd t)})
        <|> try(do{ mid "String"; return AsTypeString})
        <|> try(do{ mid "Object"; return AsTypeObject})
        <|> try(do{ op "*"; return AsTypeDynamic})
        <|> try(do{ mid "Array"; return $ AsTypeArray AsTypePlaceHolder})
        <|> try(do{ mid "Function"; return $ AsTypeFunction})
-       <|> do{ i <- ident; return $ AsTypeUserDefined (showc i)}
+       <|> do{ i <- ident; return $ AsTypeUserDefined (showd i)}
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
 parseTokens filename ts = runParser program initState filename ts

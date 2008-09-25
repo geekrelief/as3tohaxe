@@ -7,15 +7,22 @@ import ActionhaXe.Prim
 import ActionhaXe.Parser
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Control.Monad.State
 
 
-updateFlag st (flag, val) = st{flags = Map.insert flag val (flags st)}
+updateFlag :: (String, Bool) -> State AsState ()
+updateFlag (flag, val) = do st <- get
+                            put st{flags = Map.insert flag val (flags st)}
+                            return ()
 
-translateAs3Ast (Program ast st) = ("", program ast st)
-                                                                                   
-program (Package p n b) st = case n of
-                                 Just ntok -> showw p ++ showw ntok ++ block b (updateFlag st ("main", False))
-                                 Nothing   -> shown p ++"indented"
+translateAs3Ast :: Package -> State AsState String
+translateAs3Ast p = do str <- program p
+                       return str
 
-block b st = case b of
+program :: Package -> State AsState String
+program (Package p n b) = do case n of
+                                 Just ntok -> do{ updateFlag ("main", False); return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ block b}
+                                 Nothing   -> return $ shown p ++"indented"
+
+block b = case b of
                  _ -> " block"
