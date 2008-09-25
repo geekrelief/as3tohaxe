@@ -141,7 +141,6 @@ storeVar v t = updateSymbol (DefVar (showd v), DiVar t)
 -- basic parsers
 
 mytoken :: (Token -> Maybe a) -> AsParser a
-
 mytoken test = token showTok posFromTok testTok
              where
                  showTok (pos, t)    = show t

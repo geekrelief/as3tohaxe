@@ -10,18 +10,18 @@ import qualified Data.Map as Map
 import Control.Monad.State
 
 
-updateFlag :: (String, Bool) -> State AsState ()
+--updateFlag :: (String, Bool) -> StateT AsState IO ()
 updateFlag (flag, val) = do st <- get
                             put st{flags = Map.insert flag val (flags st)}
                             return ()
 
-translateAs3Ast :: Package -> State AsState String
+--translateAs3Ast :: Package -> StateT AsState IO String
 translateAs3Ast p = do str <- program p
                        return str
 
-program :: Package -> State AsState String
+--program :: Package -> StateT AsState IO String
 program (Package p n b) = do case n of
-                                 Just ntok -> do{ updateFlag ("main", False); return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ block b}
+                                 Just ntok -> do{ liftIO $ putStrLn "in package"; updateFlag ("main", False); return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ block b}
                                  Nothing   -> return $ shown p ++"indented"
 
 block b = case b of
