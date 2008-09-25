@@ -13,22 +13,22 @@ type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
 
 cdata :: CToken -> String
-cdata x = foldr (\t s -> (tokString t) ++ s) "" (fst x)
-    where tokString x = case tokenItem x of
-                            TokenIdent s' -> s'
-                            TokenOp    o  -> o
+cdata x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
+
+cdataw :: CToken -> String
+cdataw x = foldr (\t s -> (tokenItemS t) ++ s) "" ((fst x)++(snd x))
 
 type AsParser = Parsec TList AsState
 
 data AsType = AsTypeVoid
             | AsTypeBoolean
-            | AsTypeNumber
+            | AsTypeNumber Name
             | AsTypeString
             | AsTypeDynamic
             | AsTypeObject
             | AsTypeArray AsType
-            | AsTypeUserDefined ([Token], [Token])
-            | AsTypeUnknown
+            | AsTypeUserDefined Name
+            | AsTypePlaceHolder
     deriving (Show, Eq, Ord)
 
            
@@ -46,7 +46,7 @@ type Attribute = String
 -- Symbol Lookup value
 data AsDefInfo = DiNone             --
                | DiClass    [Attribute] (Maybe AsDef) (Maybe [AsDef]) -- attributes, extends, implements
-               | DiFunction [Attribute]
+               | DiFunction [Attribute] 
                | DiVar      AsType
     deriving (Show, Eq, Ord)
 
@@ -54,11 +54,11 @@ type AsDefTuple = (AsDef, AsDefInfo)
 
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
-data AsState = AsState{ curId::Int, path::[Int], scopes::Tree AsStateEl }
+data AsState = AsState{ curId::Int, flags::Map String Bool, path::[Int], scopes::Tree AsStateEl }
     deriving (Show)
 
 initState :: AsState
-initState = AsState{ curId = 0, path = [0], scopes = newScope 0}
+initState = AsState{ curId = 0, path = [0], flags = Map.empty, scopes = newScope 0}
 
 enterScope :: AsParser ()
 enterScope = do x <- getState
@@ -102,18 +102,27 @@ updateS d x = do let p = path x
                  return x{scopes = s'}
 
 traverseS :: [Int] -> Tree AsStateEl -> AsDefTuple -> Tree AsStateEl
-traverseS (p:[]) t (d, di) = if p == (sid $ rootLabel t) then t{ rootLabel = AsStateEl { sid = (sid $ rootLabel t), scope = (Map.insert d di (scope $ rootLabel t))}} else fail "dead end"
+traverseS (p:[]) t (d, di) = if p == (sid $ rootLabel t) then t{ rootLabel = AsStateEl { sid = (sid $ rootLabel t), scope = (Map.insert d di (scope $ rootLabel t))}} else fail $ "\n\n--Error: in updating state "++(show p)++" "++(show t)
 traverseS (p:ps) t dt = if p == (sid $ rootLabel t) then t{ subForest = traverseS' ps (subForest t) dt }  else t
 
 -- check the subtrees
 traverseS' :: [Int] -> Forest AsStateEl -> AsDefTuple -> Forest AsStateEl
 traverseS' path@(p:[]) [t] dt = [traverseS path t dt]
-traverseS' path@(p:ps) (t:ts) dt = if p == (sid $ rootLabel t) then ((traverseS ps t dt):ts) else (t:(traverseS' path ts dt))
+traverseS' path@(p:ps) (t:ts) dt = if p == (sid $ rootLabel t) then ((traverseS path t dt):ts) else (t:(traverseS' path ts dt))
 
 storePackage :: Maybe CToken -> AsParser ()
 storePackage p = case p of
                      Just x -> updateSymbol (DefPackage (cdata x), DiNone)
-                     Nothing -> return ()
+                     Nothing -> updateSymbol (DefPackage "//noname", DiNone)
+
+storeClass :: CToken -> AsParser ()
+storeClass c = updateSymbol (DefClass (cdata c), DiNone)
+
+storeMethod :: CToken -> AsParser ()
+storeMethod m = updateSymbol (DefFunction (cdata m), DiNone)
+
+storeVar :: CToken -> AsType -> AsParser ()
+storeVar v t = updateSymbol (DefVar (cdata v), DiVar t)
 
 -- basic parsers
 
@@ -144,19 +153,23 @@ whiteSpace = many (white <|> nl <|> com)
 mylexeme p = do{ x <- p; w <- whiteSpace; return (x, w)}
 
 num' = mytoken $ \t -> case tokenItem t of
-                          TokenNum x -> Just t
+                          TokenNum x -> Just [t]
                           _ -> Nothing
 
 id' = mytoken $ \t -> case tokenItem t of
                          TokenIdent x -> Just [t]
                          _ -> Nothing
 
+mid' i = mytoken $ \t -> case tokenItem t of
+                         TokenIdent i' | i == i'  -> Just [t]
+                         _ -> Nothing
+
 str' = mytoken $ \t -> case tokenItem t of
-                         TokenString x -> Just t
+                         TokenString x -> Just [t]
                          _ -> Nothing
 
 reg' = mytoken $ \t -> case tokenItem t of
-                          TokenRegex x -> Just t
+                          TokenRegex x -> Just [t]
                           _ -> Nothing
 
 kw' k = mytoken $ \t -> case tokenItem t of
@@ -168,23 +181,34 @@ op' o = mytoken $ \t -> case tokenItem t of
                            _ -> Nothing
 
 xml' = mytoken $ \t -> case tokenItem t of
-                           TokenXml x -> Just t
+                           TokenXml x -> Just [t]
                            _ -> Nothing
 
+num = mylexeme $ num'
+str = mylexeme $ str'
+reg = mylexeme $ reg'
+
+mid i = mylexeme $ mid' i
 kw k = mylexeme $ kw' k
 op o = mylexeme $ op' o
 
-sepByI1 :: AsParser [a] -> AsParser [a] -> AsParser [a]
+sepByI1 :: AsParser [a] -> AsParser [a] -> AsParser [[a]]
 sepByI1 p sep = do{ x <- p
                  ; xs <- many (do{ s <- sep; i<- p; return (s++i)})
-                 ; return $ concat (x:xs)
+                 ; return (x:xs)
                  }
 
-ident' = do{ n <- sepBy1 id' (op' "."); return (concat n)}
+sepEndByI1 :: AsParser [a] -> AsParser [a] -> AsParser [[a]]
+sepEndByI1 p sep = do{ x <- sepEndBy1 p sep
+                     ; s <- sep
+                     ; return $ x++[s]
+                     }
+
+ident' = do{ n <- sepByI1 id' (op' "."); return (concat n)}
 -- ident : qualified identifier
 ident = mylexeme $ ident'
 -- sident : qualified identifier with possible * at end
-sident = mylexeme $ try( do{ n <- sepEndBy1 id' (op' "."); o <- op' "*"; return $ (concat n) ++ o}) <|> ident'
+sident = mylexeme $ try( do{ n <- sepEndByI1 id' (op' "."); o <- op' "*"; return $ (concat n) ++ o}) <|> ident'
 -- nident : identifier qualified with namespace
 nident = mylexeme $ do{ q<- try(do{ n'<- ident'; c <- op' "::"; return $ n'++c }) <|> return []; n <- ident'; return $ q++n } 
 

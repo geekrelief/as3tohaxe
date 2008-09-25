@@ -9,11 +9,20 @@ import Text.Parsec.Combinator
 import Text.Parsec.Perm
 
 type Semi = Maybe CToken
+emptyctok = ([],[])
 
 data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
-                | ImportDecl CToken CToken Semi
-                | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem
+                | ImportDecl CToken CToken Semi  -- import identifier semicolon
+                | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements
+                | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
+    deriving (Show)
+
+data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
+    deriving (Show)
+
+data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
+         | RestArg [CToken] CToken -- ..., name
     deriving (Show)
 
 data Ast = Program Package AsState
@@ -33,18 +42,48 @@ inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- importDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- classDecl; i <- inBlock; return $ [x] ++ i})
+      <|> try(do{ x <- methodDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 
-classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); b <- block; return $ ClassDecl a k i e im b}
+classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); storeClass i; b <- block; return $ ClassDecl a k i e im b}
 
-classAttributes = permute $ list <$?> (([],[]), (try (kw "public") <|> (kw "internal"))) <|?> (([],[]), kw "static") <|?> (([],[]), kw "dynamic")
+classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "internal"))) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "dynamic")
     where list v s d = filter (\a -> fst a /= []) [v,s,d]
 
 classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 
 classImplements = do{ k <- kw "implements"; s <- sepBy1 (nident) (op ","); return $ k:s}
+
+methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- block; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
+methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
+    where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]
+
+signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( do{ o <- op ":"; r <- datatype; return (o, r)}); return $ Signature lp a rp ret}
+
+sigargs = do{ s <- many sigarg; return s}
+sigarg = try(do{ a <- ident; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o' <- op "="; a <- defval; return $ [o']++a}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
+     <|> do{ d <- count 3 (op "."); i <- ident; storeVar i (AsTypeArray AsTypeDynamic) ; return $ RestArg d i }
+
+defval = do{ x <- manyTill defval' (try (lookAhead (op ",")) <|> lookAhead(op ")")); return x }
+
+defval' = try( do{ x <- kw "null"; return x})
+      <|> try( do{ x <- kw "true"; return x})
+      <|> try( do{ x <- kw "false"; return x})
+      <|> try( do{ x <- ident; return x})
+      <|> try( do{ x <- str; return x})
+      <|> do{ x <- num; return x}
+
+datatype = try(do{ kw "void";   return AsTypeVoid})
+       <|> try(do{ t <- mid "int";    return $ AsTypeNumber (cdata t)})
+       <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (cdata t)})
+       <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (cdata t)})
+       <|> try(do{ mid "String"; return AsTypeString})
+       <|> try(do{ mid "Object"; return AsTypeObject})
+       <|> try(do{ op "*"; return AsTypeDynamic})
+       <|> try(do{ mid "Array"; return $ AsTypeArray AsTypePlaceHolder})
+       <|> do{ i <- ident; return $ AsTypeUserDefined (cdata i)}
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
 parseTokens filename ts = runParser program initState filename ts

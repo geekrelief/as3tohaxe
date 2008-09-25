@@ -1,6 +1,6 @@
 -- Turn the as3 source into Tokens for parsing
 
-module ActionhaXe.Lexer (runLexer, Token, tokenSource, tokenLine, tokenCol, tokenItem, TokenType(..), TokenNum(..), keywords, operators) where
+module ActionhaXe.Lexer (runLexer, Token, tokenSource, tokenLine, tokenCol, tokenItem, tokenItemS, TokenType(..), TokenNum(..), keywords, operators) where
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
@@ -15,6 +15,22 @@ tokenSource (s, i) = sourceName s
 tokenLine (s, i) = sourceLine s
 tokenCol (s, i) = sourceColumn s
 tokenItem (s, i) = i
+
+tokenItemS (s, i) = case i of
+                        TokenWhite   s -> s
+                        TokenComment s -> s 
+                        TokenNum s -> case s of
+                                          TokenInteger n -> n
+                                          TokenDouble  n -> n
+                                          TokenOctal   n -> n
+                                          TokenHex     n -> n
+                        TokenIdent   s -> s
+                        TokenString  s -> s
+                        TokenNl      s -> s
+                        TokenRegex   (s,s') -> "/"++s++"/"++s'
+                        TokenKw      s -> s
+                        TokenOp      s -> s
+                        TokenUnknown  s -> s
 
 data TokenNum    = TokenInteger String
                  | TokenDouble String
