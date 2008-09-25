@@ -7,7 +7,7 @@
 --       if
 --       case
 
-module ActionhaXe.Parser where
+module ActionhaXe.Parser(Semi, BlockItem(..), Signature(..), Arg(..), Ast(..), Package(..), parseTokens) where
 
 import ActionhaXe.Lexer
 import ActionhaXe.Prim
@@ -33,10 +33,10 @@ data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name,
          | RestArg [CToken] CToken -- ..., name
     deriving (Show)
 
-data Ast = Program Package AsState
+data Package = Package CToken (Maybe CToken) BlockItem -- package, maybe name, block
     deriving (Show)
 
-data Package = Package CToken (Maybe CToken) BlockItem
+data Ast = Program Package AsState
     deriving (Show)
 
 program :: AsParser Ast
@@ -87,15 +87,15 @@ defval' = try( do{ x <- kw "null"; return x})
 varDecl = do{ ns <- optionMaybe(ident); k <- kw "var"; n <- nident; c <- op ":"; dt <- datatype; storeVar n dt; return $ VarDecl ns k n c dt}
 
 datatype = try(do{ kw "void";   return AsTypeVoid})
-       <|> try(do{ t <- mid "int";    return $ AsTypeNumber (cdata t)})
-       <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (cdata t)})
-       <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (cdata t)})
+       <|> try(do{ t <- mid "int";    return $ AsTypeNumber (showc t)})
+       <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (showc t)})
+       <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (showc t)})
        <|> try(do{ mid "String"; return AsTypeString})
        <|> try(do{ mid "Object"; return AsTypeObject})
        <|> try(do{ op "*"; return AsTypeDynamic})
        <|> try(do{ mid "Array"; return $ AsTypeArray AsTypePlaceHolder})
        <|> try(do{ mid "Function"; return $ AsTypeFunction})
-       <|> do{ i <- ident; return $ AsTypeUserDefined (cdata i)}
+       <|> do{ i <- ident; return $ AsTypeUserDefined (showc i)}
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
 parseTokens filename ts = runParser program initState filename ts

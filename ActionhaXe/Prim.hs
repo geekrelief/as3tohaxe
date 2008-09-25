@@ -12,11 +12,20 @@ type Name = String
 type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
 
-cdata :: CToken -> String
-cdata x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
+-- data
+showc :: CToken -> String
+showc x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
 
-cdataw :: CToken -> String
-cdataw x = foldr (\t s -> (tokenItemS t) ++ s) "" ((fst x)++(snd x))
+-- data with whitespace
+showw :: CToken -> String
+showw x = foldr (\t s -> (tokenItemS t) ++ s) "" ((fst x)++(snd x))
+
+-- the whitespace after the first newline
+shown :: CToken -> String
+shown x = tailAtN $ snd $ break (== '\n') $ foldr (\t s -> (tokenItemS t) ++ s) "" (snd x)
+    where tailAtN [] = ""
+          tailAtN t  = tail t
+           
 
 type AsParser = Parsec TList AsState
 
@@ -113,17 +122,17 @@ traverseS' path@(p:ps) (t:ts) dt = if p == (sid $ rootLabel t) then ((traverseS 
 
 storePackage :: Maybe CToken -> AsParser ()
 storePackage p = case p of
-                     Just x -> updateSymbol (DefPackage (cdata x), DiNone)
+                     Just x -> updateSymbol (DefPackage (showc x), DiNone)
                      Nothing -> updateSymbol (DefPackage "//noname", DiNone)
 
 storeClass :: CToken -> AsParser ()
-storeClass c = updateSymbol (DefClass (cdata c), DiNone)
+storeClass c = updateSymbol (DefClass (showc c), DiNone)
 
 storeMethod :: CToken -> AsParser ()
-storeMethod m = updateSymbol (DefFunction (cdata m), DiNone)
+storeMethod m = updateSymbol (DefFunction (showc m), DiNone)
 
 storeVar :: CToken -> AsType -> AsParser ()
-storeVar v t = updateSymbol (DefVar (cdata v), DiVar t)
+storeVar v t = updateSymbol (DefVar (showc v), DiVar t)
 
 -- basic parsers
 
