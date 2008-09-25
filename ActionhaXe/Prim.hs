@@ -27,8 +27,9 @@ data AsType = AsTypeVoid
             | AsTypeDynamic
             | AsTypeObject
             | AsTypeArray AsType
-            | AsTypeUserDefined Name
             | AsTypePlaceHolder
+            | AsTypeFunction
+            | AsTypeUserDefined Name
     deriving (Show, Eq, Ord)
 
            
