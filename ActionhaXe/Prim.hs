@@ -63,7 +63,7 @@ type AsDefTuple = (AsDef, AsDefInfo)
 
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
-data AsState = AsState{ curId::Int, flags::Map String Bool, path::[Int], scopes::Tree AsStateEl }
+data AsState = AsState{ curId::Int, flags::Map String String, path::[Int], scopes::Tree AsStateEl }
     deriving (Show)
 
 initState :: AsState
