@@ -24,6 +24,7 @@ data BlockItem =  Tok        CToken
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
+                | Regex      CToken
     deriving (Show)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
@@ -52,6 +53,7 @@ inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- classDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- methodDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- varDecl; i <- inBlock; return $ [x] ++ i})
+      <|> try(do{ x <- reg; i <- inBlock; return $ [(Regex x)] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}

@@ -27,7 +27,7 @@ tokenItemS (s, i) = case i of
                         TokenIdent   s -> s
                         TokenString  s -> s
                         TokenNl      s -> s
-                        TokenRegex   (s,s') -> "/"++s++"/"++s'
+                        TokenRegex   (s,s') -> s++s'
                         TokenKw      s -> s
                         TokenOp      s -> s
                         TokenUnknown  s -> s

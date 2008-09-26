@@ -31,14 +31,15 @@ packageBlock (Block l bs r)  = showw l ++ foldr (\b s -> blockItem b ++ s ) "" b
 block (Block l bs r)  = showb l ++ foldr (\b s -> blockItem b ++ s ) "" bs ++ showb r
 
 blockItem b = case b of  -- Use the list monad here to try all possible paths?
-                  Tok t                   -> tok b
+                  Tok t                   -> tok t
                   Block _ _ _             -> block b
                   ImportDecl _ _ _        -> importDecl b
                   ClassDecl _ _ _ _ _ _   -> classDecl b
                   MethodDecl _ _ _ _ _ _  -> methodDecl b
-                  VarDecl _ _ _ _ _ _      -> varDecl b
+                  VarDecl _ _ _ _ _ _     -> varDecl b
+                  Regex x                 -> "~" ++ showb x
 
-tok t = "tok\n"
+tok t = showb t
 
 importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybeEl showb s  -- look up and adjust
 
@@ -47,7 +48,7 @@ classDecl (ClassDecl a c n e i b) =  attr a ++ showb c ++ showb n ++ maybeEl sho
 
 methodDecl (MethodDecl a f ac n s b) = "method\n"
 
-varDecl (VarDecl ns v n c d s) = namespace ns ++ showl [v,n,c] ++ datatype d ++ maybeEl showw s
+varDecl (VarDecl ns v n c d s) = namespace ns ++ showl [v,n,c] ++ datatype d ++ maybeEl showb s
 
 namespace ns = case ns of 
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
