@@ -63,7 +63,7 @@ classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "in
 
 classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 
-classImplements = do{ k <- kw "implements"; s <- sepBy1 (nident) (op ","); return $ k:s}
+classImplements = do{ k <- kw "implements"; s <- sepByCI1 nident (op ","); return $ k:s}
 
 methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- block; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
 

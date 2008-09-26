@@ -214,6 +214,12 @@ sepByI1 p sep = do{ x <- p
                  ; return (x:xs)
                  }
 
+sepByCI1 :: AsParser CToken -> AsParser CToken -> AsParser [CToken]
+sepByCI1 p sep = do{ x <- p
+                 ; xs <- many (do{ s <- sep; i<- p; return [s,i]})
+                 ; return (x:(concat xs))
+                 }
+
 sepEndByI1 :: AsParser [a] -> AsParser [a] -> AsParser [[a]]
 sepEndByI1 p sep = do{ x <- sepEndBy1 p sep
                      ; s <- sep
