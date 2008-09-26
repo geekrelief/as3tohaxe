@@ -74,7 +74,7 @@ signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( d
 
 sigargs = do{ s <- many sigarg; return s}
 sigarg = try(do{ a <- ident; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o' <- op "="; a <- defval; return $ [o']++a}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
-     <|> do{ d <- count 3 (op "."); i <- ident; storeVar i (AsTypeArray AsTypeDynamic) ; return $ RestArg d i }
+     <|> do{ d <- count 3 (op "."); i <- ident; storeVar i AsTypeRest; return $ RestArg d i }
 
 defval = do{ x <- manyTill defval' (try (lookAhead (op ",")) <|> lookAhead(op ")")); return x }
 
@@ -89,17 +89,19 @@ varDecl = do{ ns <- optionMaybe(varAttributes); k <- kw "var"; n <- nident; c <-
 varAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
 
-datatype = try(do{ kw "void";   return AsTypeVoid})
-       <|> try(do{ t <- mid "int";    return $ AsTypeNumber (showd t)})
-       <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (showd t)})
-       <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (showd t)})
-       <|> try(do{ mid "Boolean"; return AsTypeBool})
-       <|> try(do{ mid "String"; return AsTypeString})
-       <|> try(do{ mid "Object"; return AsTypeObject})
-       <|> try(do{ op "*"; return AsTypeDynamic})
-       <|> try(do{ mid "Array"; return $ AsTypeArray AsTypePlaceHolder})
-       <|> try(do{ mid "Function"; return $ AsTypeFunction})
-       <|> do{ i <- ident; return $ AsTypeUserDefined (showd i)}
+datatype = try(do{ t <- kw "void";      return $ AsType t})
+       <|> try(do{ t <- mid "int";      return $ AsType t})
+       <|> try(do{ t <- mid "uint";     return $ AsType t})
+       <|> try(do{ t <- mid "Number";   return $ AsType t})
+       <|> try(do{ t <- mid "Boolean";  return $ AsType t})
+       <|> try(do{ t <- mid "String";   return $ AsType t})
+       <|> try(do{ t <- mid "Object";   return $ AsType t})
+       <|> try(do{ t <- op "*";         return $ AsType t})
+       <|> try(do{ t <- mid "Array";    return $ AsType t})
+       <|> try(do{ t <- mid "Function"; return $ AsType t})
+       <|> try(do{ t <- mid "RegExp";   return $ AsType t})
+       <|> try(do{ t <- mid "XML";      return $ AsType t})
+       <|> do{ i <- ident; return $ AsTypeUser i}
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
 parseTokens filename ts = runParser program initState filename ts

@@ -19,6 +19,8 @@ updateFlag (flag, val) = do st <- get
 translateAs3Ast p = do str <- program p
                        return str
 
+maybeEl f i = maybe "" (\m -> f m) i
+
 --program :: Package -> StateT AsState IO String
 program (Package p n b) = do case n of
                                  Just ntok -> do{ updateFlag ("main", False); return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ packageBlock b}
@@ -38,11 +40,34 @@ blockItem b = case b of  -- Use the list monad here to try all possible paths?
 
 tok t = "tok\n"
 
-importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybe "" (\a -> showb a) s  -- look up and adjust
+importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybeEl showb s  -- look up and adjust
 
-classDecl (ClassDecl a c n e i b) =  attr a ++ showb c ++ showb n ++ maybe "" (\m -> showl m) e ++ maybe "" (\m -> showl m) i ++ block b
+classDecl (ClassDecl a c n e i b) =  attr a ++ showb c ++ showb n ++ maybeEl showl e ++ maybeEl showl i ++ block b
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; _ -> "" }) as
 
 methodDecl (MethodDecl a f ac n s b) = "method\n"
 
-varDecl (VarDecl ns v n c d s) = "var\n"
+varDecl (VarDecl ns v n c d s) = namespace ns ++ showl [v,n,c] ++ datatype d ++ maybeEl showw s
+
+namespace ns = case ns of 
+                   Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
+                   Nothing -> ""
+
+datatype d = case d of
+                 AsType n -> (case (showd n) of
+                                  "void"    -> "Void"
+                                  "Boolean" -> "Bool"
+                                  "uint"    -> "UInt"
+                                  "int"     -> "Int"
+                                  "Number"  -> "Float"
+                                  "String"  -> "String"
+                                  "*"       -> "Dynamic"
+                                  "Object"  -> "Dynamic"
+                                  "Function"-> "Dynamic"
+                                  "Array"   -> "Array<Dynamic>"
+                                  "XML"     -> "Xml"
+                                  "RegExp"  -> "EReg"
+                             ) ++ showw n
+                 AsTypeRest -> "Array<Dynamic>"
+                 AsTypeUser n -> showb n
+

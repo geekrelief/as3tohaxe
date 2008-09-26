@@ -36,18 +36,10 @@ showl xs = foldr (\t s -> showb t ++ s) "" xs
 
 type AsParser = Parsec TList AsState
 
-data AsType = AsTypeVoid
-            | AsTypeBool
-            | AsTypeNumber Name
-            | AsTypeString
-            | AsTypeDynamic
-            | AsTypeObject
-            | AsTypeArray AsType
-            | AsTypePlaceHolder
-            | AsTypeFunction
-            | AsTypeUserDefined Name
+data AsType = AsType CToken
+            | AsTypeRest
+            | AsTypeUser CToken
     deriving (Show, Eq, Ord)
-
            
 -- Symbol Lookup key
 data AsDef = DefPackage   Name
@@ -208,6 +200,7 @@ mid i = mylexeme $ mid' i
 kw k = mylexeme $ kw' k
 op o = mylexeme $ op' o
 
+-- sepByI includes the separators in the list
 sepByI1 :: AsParser [a] -> AsParser [a] -> AsParser [[a]]
 sepByI1 p sep = do{ x <- p
                  ; xs <- many (do{ s <- sep; i<- p; return (s++i)})
