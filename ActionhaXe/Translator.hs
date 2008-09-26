@@ -21,8 +21,28 @@ translateAs3Ast p = do str <- program p
 
 --program :: Package -> StateT AsState IO String
 program (Package p n b) = do case n of
-                                 Just ntok -> do{ liftIO $ putStrLn "in package"; updateFlag ("main", False); return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ block b}
-                                 Nothing   -> return $ shown p ++"indented"
+                                 Just ntok -> do{ updateFlag ("main", False); return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ packageBlock b}
+                                 Nothing   -> do{ updateFlag ("main", True); return $ showw p ++ packageBlock b}
 
-block b = case b of
-                 _ -> " block"
+packageBlock (Block l bs r)  = showw l ++ foldr (\b s -> blockItem b ++ s ) "" bs
+
+block (Block l bs r)  = showb l ++ foldr (\b s -> blockItem b ++ s ) "" bs ++ showb r
+
+blockItem b = case b of  -- Use the list monad here to try all possible paths?
+                  Tok t                   -> tok b
+                  Block _ _ _             -> block b
+                  ImportDecl _ _ _        -> importDecl b
+                  ClassDecl _ _ _ _ _ _   -> classDecl b
+                  MethodDecl _ _ _ _ _ _  -> methodDecl b
+                  VarDecl _ _ _ _ _ _      -> varDecl b
+
+tok t = "tok\n"
+
+importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybe "" (\a -> showb a) s  -- look up and adjust
+
+classDecl (ClassDecl a c n e i b) =  attr a ++ showb c ++ showb n ++ maybe "" (\m -> showl m) e ++ maybe "" (\m -> showl m) i ++ block b
+    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; _ -> "" }) as
+
+methodDecl (MethodDecl a f ac n s b) = "method\n"
+
+varDecl (VarDecl ns v n c d s) = "var\n"

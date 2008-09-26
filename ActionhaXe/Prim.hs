@@ -29,12 +29,15 @@ shown :: CToken -> String
 shown x = tailAtN $ snd $ break (== '\n') $ foldr (\t s -> (tokenItemS t) ++ s) "" (snd x)
     where tailAtN [] = ""
           tailAtN t  = tail t
+
+showl :: [CToken] -> String
+showl xs = foldr (\t s -> showb t ++ s) "" xs
            
 
 type AsParser = Parsec TList AsState
 
 data AsType = AsTypeVoid
-            | AsTypeBoolean
+            | AsTypeBool
             | AsTypeNumber Name
             | AsTypeString
             | AsTypeDynamic

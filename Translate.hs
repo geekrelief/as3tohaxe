@@ -17,4 +17,4 @@ main = do args <- getArgs
                         Right (Program ast st) -> return (ast, st)
                         Left err  -> fail $ show err
           trans <- runStateT (translateAs3Ast (fst program)) (snd program)
-          print $ fst trans
+          putStrLn $ fst trans

@@ -20,10 +20,10 @@ emptyctok = ([],[])
 
 data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
-                | ImportDecl CToken CToken Semi  -- import identifier semicolon
-                | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements
+                | ImportDecl CToken CToken Semi  -- import identifier ;
+                | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
-                | VarDecl    (Maybe CToken) CToken CToken CToken AsType -- maybe namespace, var, identifier, :, datatype
+                | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
     deriving (Show)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
@@ -66,6 +66,7 @@ classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 classImplements = do{ k <- kw "implements"; s <- sepBy1 (nident) (op ","); return $ k:s}
 
 methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- block; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
+
 methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
     where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]
 
@@ -84,12 +85,15 @@ defval' = try( do{ x <- kw "null"; return x})
       <|> try( do{ x <- str; return x})
       <|> do{ x <- num; return x}
 
-varDecl = do{ ns <- optionMaybe(ident); k <- kw "var"; n <- nident; c <- op ":"; dt <- datatype; storeVar n dt; return $ VarDecl ns k n c dt}
+varDecl = do{ ns <- optionMaybe(varAttributes); k <- kw "var"; n <- nident; c <- op ":"; dt <- datatype; s <- maybeSemi; storeVar n dt; return $ VarDecl ns k n c dt s}
+varAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
+    where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
 
 datatype = try(do{ kw "void";   return AsTypeVoid})
        <|> try(do{ t <- mid "int";    return $ AsTypeNumber (showd t)})
        <|> try(do{ t <- mid "uint";   return $ AsTypeNumber (showd t)})
        <|> try(do{ t <- mid "Number"; return $ AsTypeNumber (showd t)})
+       <|> try(do{ mid "Boolean"; return AsTypeBool})
        <|> try(do{ mid "String"; return AsTypeString})
        <|> try(do{ mid "Object"; return AsTypeObject})
        <|> try(do{ op "*"; return AsTypeDynamic})
