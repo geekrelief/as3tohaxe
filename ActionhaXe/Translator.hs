@@ -84,18 +84,26 @@ methodDecl (MethodDecl a f ac n s b) =
        if inMain == mainPackage && className == (showd n) && classAttr == "public"
            then do return $ "static " ++ showb f ++ "main() "++ x
            else if className == (showd n)
-                    then do return $ attr a ++ showb f ++ "new"++showw n ++ signature s ++ x
+                    then do return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x
                     else do return $ attr a ++ showb f ++ accessor ac ++ showb n ++ signature s ++ x
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
           inMainAttr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
           accessor ac = maybeEl showb ac
           funcname n = showb n -- if method has same name as class then replace with new
-          signature (Signature l args r ret) = showb l ++ showb r ++ rettype ret
-              where rettype r = case r of
-                                    Just (c, t) -> showb c ++ datatype t
-                                    Nothing     -> ""
 
-varDecl (VarDecl ns v n c d s) = namespace ns ++ showl [v,n,c] ++ datatype d ++ maybeEl showb s
+signatureArgs (Signature l args r ret) = showb l ++ showArgs args  ++ showb r
+
+rettype ret = case ret of
+                  Just (c, t) -> showb c ++ datatype t
+                  Nothing     -> ""
+
+signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ rettype ret
+
+showArgs as = concat $ map showArg as
+    where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
+
+
+varDecl (VarDecl ns v n c d s) = namespace ns ++ "var" ++ showw v ++ showl [n,c] ++ datatype d ++ maybeEl showb s
 
 namespace ns = case ns of 
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
