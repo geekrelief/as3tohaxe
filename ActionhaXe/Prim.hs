@@ -6,6 +6,8 @@ import Text.Parsec.Prim
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Tree
 
 type Name = String
@@ -63,11 +65,11 @@ type AsDefTuple = (AsDef, AsDefInfo)
 
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
-data AsState = AsState{ curId::Int, flags::Map String String, path::[Int], scopes::Tree AsStateEl }
+data AsState = AsState{ curId::Int, flags::Map String String, initMembers::Set String, path::[Int], scopes::Tree AsStateEl }
     deriving (Show)
 
 initState :: AsState
-initState = AsState{ curId = 0, path = [0], flags = Map.empty, scopes = newScope 0}
+initState = AsState{ curId = 0, path = [0], flags = Map.empty, initMembers = Set.empty, scopes = newScope 0}
 
 enterScope :: AsParser ()
 enterScope = do x <- getState

@@ -17,4 +17,5 @@ main = do args <- getArgs
                         Right (Program ast st) -> return (ast, st)
                         Left err  -> fail $ show err
           trans <- runStateT (translateAs3Ast (fst program)) (snd program)
-          putStrLn $ fst trans
+          let outfilename = reverse $ "xh" ++ ( drop 2 $ reverse filename)
+          writeFile outfilename $ fst trans

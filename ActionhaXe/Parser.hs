@@ -22,6 +22,7 @@ data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
+                | MemberVarDecl    (Maybe [CToken]) CToken CToken CToken AsType (Maybe [CToken]) Semi -- maybe attributes, var, identifier, :, datatype, maybe( = initialValue), ;
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
                 | Regex      CToken
@@ -43,22 +44,42 @@ data Ast = Program Package AsState
 program :: AsParser Ast
 program = do{ x <- package; a <- getState; return $ Program x a}
 
-package = do{ w <- startWs; p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- block; return $ Package w p i b }
+package = do{ w <- startWs; p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- packageBlock; return $ Package w p i b }
+
+packageBlock = do{ l <- op "{"; enterScope; x <- inPackageBlock; r <- op "}"; exitScope; return $ Block l x r }
+
+inPackageBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- importDecl; i <- inPackageBlock; return $ [x] ++ i})
+      <|> try(do{ x <- classDecl; i <- inBlock; return $ [x] ++ i})
+      <|> try(do{ x <- anytok; i <- inPackageBlock; return $ [(Tok x)] ++ i})
+
+classBlock = do{ l <- op "{"; enterScope; x <- inClassBlock; r <- op "}"; exitScope; return $ Block l x r }
+
+inClassBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
+      <|> try(do{ x <- memberVarDecl; i <- inClassBlock; return $ [x] ++ i})
+      <|> try(do{ x <- reg; i <- inClassBlock; return $ [(Regex x)] ++ i})
+      <|> try(do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
+
+methodBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
+
+inMethodBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
+      <|> try(do{ x <- varDecl; i <- inMethodBlock; return $ [x] ++ i})
+      <|> try(do{ x <- reg; i <- inMethodBlock; return $ [(Regex x)] ++ i})
+      <|> try(do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
-      <|> try(do{ x <- importDecl; i <- inBlock; return $ [x] ++ i})
-      <|> try(do{ x <- classDecl; i <- inBlock; return $ [x] ++ i})
-      <|> try(do{ x <- methodDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- varDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- reg; i <- inBlock; return $ [(Regex x)] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 
-classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); storeClass i; b <- block; return $ ClassDecl a k i e im b}
+classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); storeClass i; b <- classBlock; return $ ClassDecl a k i e im b}
 
 classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "internal"))) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "dynamic")
     where list v s d = filter (\a -> fst a /= []) [v,s,d]
@@ -67,7 +88,7 @@ classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 
 classImplements = do{ k <- kw "implements"; s <- sepByCI1 nident (op ","); return $ k:s}
 
-methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- block; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
+methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- methodBlock; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
 
 methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
     where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]
@@ -90,6 +111,16 @@ defval' = try( do{ x <- kw "null"; return x})
 varDecl = do{ ns <- optionMaybe(varAttributes); k <- try(kw "var") <|> (kw "const"); n <- nident; c <- op ":"; dt <- datatype; s <- maybeSemi; storeVar n dt; return $ VarDecl ns k n c dt s}
 varAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
+
+memberVarDecl = do{ ns <- optionMaybe(varAttributes)
+                  ; k <- try(kw "var") <|> (kw "const")
+                  ; n <- nident
+                  ; c <- op ":"
+                  ; dt <- datatype
+                  ; s <- maybeSemi
+                  ; i <- optionMaybe( do{ e <- op "="; d <- defval'; return [e, d]})
+--                  ; storeVar n dt
+                  ; return $ MemberVarDecl ns k n c dt i s}
 
 datatype = try(do{ t <- kw "void";      return $ AsType t})
        <|> try(do{ t <- mid "int";      return $ AsType t})
