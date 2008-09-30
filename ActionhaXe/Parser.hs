@@ -87,7 +87,7 @@ defval' = try( do{ x <- kw "null"; return x})
       <|> try( do{ x <- str; return x})
       <|> do{ x <- num; return x}
 
-varDecl = do{ ns <- optionMaybe(varAttributes); k <- kw "var"; n <- nident; c <- op ":"; dt <- datatype; s <- maybeSemi; storeVar n dt; return $ VarDecl ns k n c dt s}
+varDecl = do{ ns <- optionMaybe(varAttributes); k <- try(kw "var") <|> (kw "const"); n <- nident; c <- op ":"; dt <- datatype; s <- maybeSemi; storeVar n dt; return $ VarDecl ns k n c dt s}
 varAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
 
