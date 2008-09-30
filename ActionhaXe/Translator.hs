@@ -37,9 +37,9 @@ translateAs3Ast p = do str <- program p
 maybeEl f i = maybe "" (\m -> f m) i
 
 --program :: Package -> StateT AsState IO String
-program (Package p n b) = do case n of
-                                 Just ntok -> do{ updateFlag fpackage $ showd ntok ; x <- packageBlock b; return $ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ x}
-                                 Nothing   -> do{ updateFlag fpackage mainPackage; x <-packageBlock b; return $ showw p ++ x}
+program (Package w p n b) = do case n of
+                                 Just ntok -> do{ updateFlag fpackage $ showd ntok ; x <- packageBlock b; return $ showb w ++ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ x}
+                                 Nothing   -> do{ updateFlag fpackage mainPackage; x <-packageBlock b; return $ showb w ++ showw p ++ x}
 
 packageBlock (Block l bs r)  = do bi <- foldrM (\b s -> do{ x <- blockItem b; return $ x ++ s} ) "" bs 
                                   return $ showw l ++ bi

@@ -34,7 +34,7 @@ data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name,
          | RestArg [CToken] CToken -- ..., name
     deriving (Show)
 
-data Package = Package CToken (Maybe CToken) BlockItem -- package, maybe name, block
+data Package = Package CToken CToken (Maybe CToken) BlockItem -- whitespace, package, maybe name, block
     deriving (Show)
 
 data Ast = Program Package AsState
@@ -43,7 +43,7 @@ data Ast = Program Package AsState
 program :: AsParser Ast
 program = do{ x <- package; a <- getState; return $ Program x a}
 
-package = do{ p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- block; return $ Package p i b }
+package = do{ w <- startWs; p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- block; return $ Package w p i b }
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 

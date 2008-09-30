@@ -158,6 +158,8 @@ com = mytoken $ \t -> case tokenItem t of
 
 whiteSpace = many (white <|> nl <|> com)
 
+startWs = do{ w <- whiteSpace; return ([], w)}
+
 mylexeme p = do{ x <- p; w <- whiteSpace; return (x, w)}
 
 num' = mytoken $ \t -> case tokenItem t of
