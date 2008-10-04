@@ -128,8 +128,8 @@ nonZeroDigit = do{ x<- oneOf "123456789"; return [x]}
 
 expPart = do{ e <- oneOf "eE"; i <- signedInt; return $ [e]++i}
 
-signedInt = try(do { s <- oneOf "+-"; i <- many digit; return $ [s]++i})
-        <|> many digit
+signedInt = try(do { s <- oneOf "+-"; i <- many1 digit; return $ [s]++i})
+        <|> many1 digit
 
 atoken = 
          try (do{ x <- keyword; return x})
