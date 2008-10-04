@@ -11,35 +11,12 @@ module ActionhaXe.Parser(Semi, BlockItem(..), Signature(..), Arg(..), Ast(..), P
 
 import ActionhaXe.Lexer
 import ActionhaXe.Prim
+import ActionhaXe.Data
 import Text.Parsec
 import Text.Parsec.Combinator
 import Text.Parsec.Perm
 
-type Semi = Maybe CToken
 emptyctok = ([],[])
-
-data BlockItem =  Tok        CToken
-                | Block      CToken [BlockItem] CToken
-                | ImportDecl CToken CToken Semi  -- import identifier ;
-                | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
-                | MemberVarDecl    (Maybe [CToken]) CToken CToken CToken AsType (Maybe [CToken]) Semi -- maybe attributes, var, identifier, :, datatype, maybe( = initialValue), ;
-                | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
-                | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
-                | Regex      CToken
-    deriving (Show)
-
-data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
-    deriving (Show)
-
-data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
-         | RestArg [CToken] CToken -- ..., name
-    deriving (Show)
-
-data Package = Package CToken CToken (Maybe CToken) BlockItem -- whitespace, package, maybe name, block
-    deriving (Show)
-
-data Ast = Program Package AsState
-    deriving (Show)
 
 program :: AsParser Ast
 program = do{ x <- package; a <- getState; return $ Program x a}
