@@ -56,7 +56,7 @@ keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue"
              "delete", "do", "else", "extends", "false", "finally", "for", "function", "if",
              "implements", "import", "internal", "is", "native", "new", "null", "package", 
              "private", "protected", "public", "return", "super", "switch", "this", "throw", 
-             "to", "true", "try", "typeof", "use", "var", "void", "while", "with",
+             "to", "true", "try", "typeof", "use", "undefined", "var", "void", "while", "with",
 -- syntactic keywords
              "each", "get", "set", "namespace", "include", "dynamic", "final", "native",
              "override", "static"
@@ -128,8 +128,7 @@ nonZeroDigit = do{ x<- oneOf "123456789"; return [x]}
 
 expPart = do{ e <- oneOf "eE"; i <- signedInt; return $ [e]++i}
 
-signedInt = try(do { s <- oneOf "+-"; i <- many digit; return $ [s]++i})
-        <|> many digit
+signedInt = do{ s <- optionMaybe (oneOf "+-"); i <- many1 digit; return $ (maybe "" (\x -> [x]) s) ++ i}
 
 atoken = 
          try (do{ x <- keyword; return x})
