@@ -15,7 +15,7 @@ xmls ts = [ format s a | t@(s, TokenXml a) <- ts]
 main = do args <- getArgs
           let filename = args!!0
           contents <- readFile filename
-          let tokens = runLexer filename contents
+          let tokens = runLexer "" contents
           putStrLn $ render $ hcat $ punctuate (text "\n") $ unknowns tokens
           putStrLn "\n\nTokenized--"
           print tokens

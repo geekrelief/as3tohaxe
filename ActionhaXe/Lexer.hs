@@ -114,8 +114,22 @@ regex = do { char '/'; notFollowedBy (char ' '); s <- manyTill escapedAnyChar (c
 
 number = try (do{ char '0'; char 'x'; x <- many1 hexDigit; return $ TokenNum $ TokenHex $ "0x"++x})
      <|> try (do{ char '0'; x <- many1 octDigit; return $ TokenNum $ TokenOctal $ "0"++x})
-     <|> try (do{ x <- many digit; char '.'; y <- many1 digit; return $ TokenNum $ TokenDouble $  x++"."++y  })
-     <|> try (do{ x <- many1 digit; return $ TokenNum $ TokenInteger $ x })
+     <|> try (do{ x <- double; return $ TokenNum $ TokenDouble $  x })
+     <|> do{ x <- many1 digit; return $ TokenNum $ TokenInteger $ x }
+
+double = try ( do{ h <- decimalInt; char '.'; t <- optionMaybe decimalInt; e <- optionMaybe expPart; return $ h++"."++(maybe "" id t)++(maybe "" id e) })
+     <|> try ( do{ char '.'; t <- decimalInt; e <- optionMaybe expPart; return $ "."++t++(maybe "" id e)})
+     <|> do{ h <- decimalInt; e <- expPart; return $ h++e}
+
+decimalInt = do{ char '0'; return "0"}
+         <|> do{ h <- nonZeroDigit; t <- many digit; return $ h++t}
+
+nonZeroDigit = do{ x<- oneOf "123456789"; return [x]}
+
+expPart = do{ e <- oneOf "eE"; i <- signedInt; return $ [e]++i}
+
+signedInt = try(do { s <- oneOf "+-"; i <- many digit; return $ [s]++i})
+        <|> many digit
 
 atoken = 
          try (do{ x <- keyword; return x})
@@ -130,7 +144,7 @@ atoken =
      <|> try (do{ x <- quotedDString; return x})
      <|> try (do{ x <- quotedSString; return x})
      <|> try (do{ x <- whiteSpace; return x}) 
-     <|> try (do{ x <- anyToken; return $ TokenUnknown $ x:[]})
+     <|> do{ x <- anyToken; return $ TokenUnknown $ x:[]}
 
 
 lexer = many1 (do { p <- getPosition; t <- atoken; return (p, t) })
