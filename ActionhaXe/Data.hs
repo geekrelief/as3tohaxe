@@ -38,7 +38,31 @@ type CToken = (TList, TList) -- compound token with a list for an entity, whites
 
 type Semi = Maybe CToken
 
+data PrimaryE = PEThis CToken                   -- this
+              | PEIdent CToken                  -- identifier
+              | PELit CToken                    -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
+              | PEArray ArrayLit                -- array literal
+              | PEObject [CToken]               -- object
+              | PEParens CToken PrimaryE CToken -- (, PrimaryE, )
+    deriving (Show)
+
+type AssignE = PrimaryE
+
+data ArrayLit = ArrayLitC CToken (Maybe Elision) CToken  -- [, maybe commas, ]
+              | ArrayLit  CToken ElementList CToken      -- [, element list, ]
+    deriving (Show)
+
+data ElementList = El (Maybe Elision) AssignE [EAE] (Maybe Elision)
+    deriving (Show)
+
+data EAE = EAE Elision AssignE
+    deriving (Show)
+
+data Elision = Elision [CToken]  -- commas possible separated by space in a list
+    deriving (Show)
+
 data BlockItem =  Tok        CToken
+                | Expr       PrimaryE
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
@@ -62,6 +86,8 @@ data Ast = Program Package AsState
     deriving (Show)
 
 type AsParser = Parsec TList AsState
+
+--- type and state structures
 
 data AsType = AsType CToken
             | AsTypeRest

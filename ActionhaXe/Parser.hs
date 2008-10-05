@@ -18,6 +18,9 @@ import Text.Parsec.Perm
 
 emptyctok = ([],[])
 
+parseTokens :: String -> [Token] -> Either ParseError Ast
+parseTokens filename ts = runParser program initState filename ts
+
 program :: AsParser Ast
 program = do{ x <- package; a <- getState; return $ Program x a}
 
@@ -44,6 +47,7 @@ inMethodBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
       <|> try(do{ x <- varDecl; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ x <- reg; i <- inMethodBlock; return $ [(Regex x)] ++ i})
+      <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
@@ -52,6 +56,7 @@ inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- varDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- reg; i <- inBlock; return $ [(Regex x)] ++ i})
+      <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
@@ -111,7 +116,32 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
        <|> try(do{ t <- mid "Function"; return $ AsType t})
        <|> try(do{ t <- mid "RegExp";   return $ AsType t})
        <|> try(do{ t <- mid "XML";      return $ AsType t})
+-- Vector.<*> new in flash 10
        <|> do{ i <- ident; return $ AsTypeUser i}
 
-parseTokens :: String -> [Token] -> Either ParseError Ast
-parseTokens filename ts = runParser program initState filename ts
+expr = do{ x <- primaryE; return $ Expr x}
+
+primaryE = try(do{ x <- kw "this"; return $ PEThis x})
+       <|> try(do{ x <- nident; return $ PEIdent x})
+       <|> try(do{ x <- kw "null"; return $ PELit x})
+       <|> try(do{ x <- kw "true"; return $ PELit x})
+       <|> try(do{ x <- kw "false"; return $ PELit x})
+       <|> try(do{ x <- str; return $ PELit x})
+       <|> try(do{ x <- num; return $ PELit x})
+       <|> try(do{ x <- arrayLit; return $ PEArray x})
+--       <|> try(do{ x <- objectLit; return x})
+       <|> do{ l <- op "("; x <- primaryE; r <- op ")"; return $ PEParens l x r}
+
+arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
+       <|> do{ l <- op "["; e <- optionMaybe elision; r <- op "]"; return $ ArrayLitC l e r}
+
+elementList = do 
+    l <- optionMaybe elision
+    e <- primaryE
+    el <- many (try(do{ c <- elision; p <- primaryE; return $ EAE c p}))
+    r <- optionMaybe elision
+    return $ El l e el r
+
+elision = do{ x <- many1 (op ","); return $ Elision x}
+
+
