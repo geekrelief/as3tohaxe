@@ -44,19 +44,19 @@ inClassBlock = try(do{ lookAhead( op "}"); return [] })
 methodBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inMethodBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
       <|> try(do{ x <- varDecl; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ x <- reg; i <- inMethodBlock; return $ [(Regex x)] ++ i})
-      <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- varDecl; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- reg; i <- inBlock; return $ [(Regex x)] ++ i})
-      <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
@@ -119,7 +119,9 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
 -- Vector.<*> new in flash 10
        <|> do{ i <- ident; return $ AsTypeUser i}
 
-expr = do{ x <- primaryE; return $ Expr x}
+expr = do{ x <- assignE; return $ Expr x}
+
+assignE = primaryE
 
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- nident; return $ PEIdent x})
@@ -129,19 +131,24 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- str; return $ PELit x})
        <|> try(do{ x <- num; return $ PELit x})
        <|> try(do{ x <- arrayLit; return $ PEArray x})
---       <|> try(do{ x <- objectLit; return x})
-       <|> do{ l <- op "("; x <- primaryE; r <- op ")"; return $ PEParens l x r}
+       <|> try(do{ x <- objectLit; return $ PEObject x})
+       <|> do{ l <- op "("; x <- expr; r <- op ")"; return $ PEParens l x r}
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
        <|> do{ l <- op "["; e <- optionMaybe elision; r <- op "]"; return $ ArrayLitC l e r}
 
 elementList = do 
     l <- optionMaybe elision
-    e <- primaryE
-    el <- many (try(do{ c <- elision; p <- primaryE; return $ EAE c p}))
+    e <- assignE
+    el <- many (try(do{ c <- elision; p <- assignE; return $ EAE c p}))
     r <- optionMaybe elision
     return $ El l e el r
 
 elision = do{ x <- many1 (op ","); return $ Elision x}
 
+objectLit = do{ l <- op "{"; x <- optionMaybe propertyNameAndValueList; r <- op "}"; return $ ObjectLit l x r}
+
+propertyNameAndValueList = do{ x <- many1 (do{ p <- propertyName; c <- op ":"; e <- assignE; s <- optionMaybe (op ","); return (p, c, e, s)}); return $ PropertyList x}
+
+propertyName = do{ x <- choice [ident, str, num]; return x}
 

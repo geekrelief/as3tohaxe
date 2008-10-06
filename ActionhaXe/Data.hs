@@ -38,12 +38,12 @@ type CToken = (TList, TList) -- compound token with a list for an entity, whites
 
 type Semi = Maybe CToken
 
-data PrimaryE = PEThis CToken                   -- this
-              | PEIdent CToken                  -- identifier
-              | PELit CToken                    -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
-              | PEArray ArrayLit                -- array literal
-              | PEObject [CToken]               -- object
-              | PEParens CToken PrimaryE CToken -- (, PrimaryE, )
+data PrimaryE = PEThis CToken                     -- this
+              | PEIdent CToken                    -- identifier
+              | PELit CToken                      -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
+              | PEArray ArrayLit                  -- array literal
+              | PEObject ObjectLit                -- {, maybe [[property : assignE],[,]] , }
+              | PEParens CToken BlockItem CToken  -- (, PrimaryE, )
     deriving (Show)
 
 type AssignE = PrimaryE
@@ -61,8 +61,12 @@ data EAE = EAE Elision AssignE
 data Elision = Elision [CToken]  -- commas possible separated by space in a list
     deriving (Show)
 
+data ObjectLit = ObjectLit CToken (Maybe PropertyList) CToken deriving (Show)
+
+data PropertyList = PropertyList [(CToken, CToken, AssignE, (Maybe CToken))]  deriving (Show) -- [propertyName, :, assignE, maybe ',']
+
 data BlockItem =  Tok        CToken
-                | Expr       PrimaryE
+                | Expr       AssignE
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
