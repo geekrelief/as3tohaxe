@@ -43,6 +43,8 @@ data PrimaryE = PEThis CToken                     -- this
               | PELit CToken                      -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
               | PEArray ArrayLit                  -- array literal
               | PEObject ObjectLit                -- {, maybe [[property : assignE],[,]] , }
+              | PERegex  CToken
+              | PEXml CToken
               | PEParens CToken BlockItem CToken  -- (, PrimaryE, )
     deriving (Show)
 
@@ -73,7 +75,6 @@ data BlockItem =  Tok        CToken
                 | MemberVarDecl    (Maybe [CToken]) CToken CToken CToken AsType (Maybe [CToken]) Semi -- maybe attributes, var, identifier, :, datatype, maybe( = initialValue), ;
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
-                | Regex      CToken
     deriving (Show)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type

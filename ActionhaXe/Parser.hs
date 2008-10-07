@@ -38,7 +38,6 @@ classBlock = do{ l <- op "{"; enterScope; x <- inClassBlock; r <- op "}"; exitSc
 inClassBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- memberVarDecl; i <- inClassBlock; return $ [x] ++ i})
-      <|> try(do{ x <- reg; i <- inClassBlock; return $ [(Regex x)] ++ i})
       <|> try(do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
 
 methodBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
@@ -47,7 +46,6 @@ inMethodBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
       <|> try(do{ x <- varDecl; i <- inMethodBlock; return $ [x] ++ i})
-      <|> try(do{ x <- reg; i <- inMethodBlock; return $ [(Regex x)] ++ i})
       <|> try(do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
@@ -56,7 +54,6 @@ inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- varDecl; i <- inBlock; return $ [x] ++ i})
-      <|> try(do{ x <- reg; i <- inBlock; return $ [(Regex x)] ++ i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
@@ -125,14 +122,15 @@ assignE = primaryE
 
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- nident; return $ PEIdent x})
-       <|> try(do{ x <- kw "null"; return $ PELit x})
-       <|> try(do{ x <- kw "true"; return $ PELit x})
-       <|> try(do{ x <- kw "false"; return $ PELit x})
+       <|> try(do{ x <- choice[(kw "null"), (kw "true"), (kw "false"), (kw "public"), (kw "private"), (kw "protected"), (kw "internal")]; return $ PELit x})
        <|> try(do{ x <- str; return $ PELit x})
        <|> try(do{ x <- num; return $ PELit x})
        <|> try(do{ x <- arrayLit; return $ PEArray x})
        <|> try(do{ x <- objectLit; return $ PEObject x})
-       <|> do{ l <- op "("; x <- expr; r <- op ")"; return $ PEParens l x r}
+       <|> try(do{ x <- reg; return $ PERegex x})
+       <|> try(do{ x <- xml; return $ PEXml x})
+-- need to add function
+       <|> do{ l <- op "("; x <- expr; r <- op ")"; return $ PEParens l x r} -- need to add commas
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
        <|> do{ l <- op "["; e <- optionMaybe elision; r <- op "]"; return $ ArrayLitC l e r}

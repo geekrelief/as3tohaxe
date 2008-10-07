@@ -28,9 +28,10 @@ tokenItemS (s, i) = case i of
                         TokenString  s -> s
                         TokenNl      s -> s
                         TokenRegex   (s,s') -> s++s'
+                        TokenXml     s -> s
                         TokenKw      s -> s
                         TokenOp      s -> s
-                        TokenUnknown  s -> s
+                        TokenUnknown s -> s
 
 data TokenNum    = TokenInteger String
                  | TokenDouble String

@@ -3,6 +3,7 @@
 module ActionhaXe.Translator where
 
 import ActionhaXe.Lexer
+import ActionhaXe.Data
 import ActionhaXe.Prim
 import ActionhaXe.Parser
 import Data.Map (Map)
@@ -77,7 +78,7 @@ blockItem b = do x <- case b of  -- Use the list monad here to try all possible 
                         MethodDecl _ _ _ _ _ _      -> do{ x <- methodDecl b; return x} 
                         MemberVarDecl _ _ _ _ _ _ _ -> do{ x <- memberVarDecl b; return x}
                         VarDecl _ _ _ _ _ _         -> do{ return $ varDecl b}
-                        Regex x                     -> do{ return $ "~" ++ showb x}  -- this should be a part of an expression
+                        Expr _                      -> do{ return $ expr b}
                  return x
 
 tok t = do let x = showb t
@@ -96,7 +97,7 @@ classDecl (ClassDecl a c n e i b) = do
          else do x <- block b
                  return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
-          attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> "" ++ showw attr; x -> showb attr }) as
+          attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
           implements is = maybeEl showl is
 
 methodDecl (MethodDecl a f ac n s b) = do 
@@ -155,3 +156,26 @@ datatype d = case d of
                  AsTypeRest -> "Array<Dynamic>"
                  AsTypeUser n -> showb n
 
+expr (Expr x) = assignE x
+
+assignE x = primaryE x
+
+primaryE x = case x of
+                 PEThis x -> showb x
+                 PEIdent x -> showb x
+                 PELit x -> showb x
+                 PEArray x -> arrayLit x
+                 PEObject x -> objectLit x
+                 PERegex x -> "~" ++ showb x
+                 PEXml x -> "Xml.parse(\""++ showd x ++ "\")" ++ showw x
+                 PEParens l x r -> showb l ++ expr x ++ showb r
+
+arrayLit (ArrayLitC l x r) = showb l ++ maybe "" elision x ++ showb r
+
+elementList (El l e el r) = maybeEl elision l ++ assignE e ++ foldr (\(EAE c p) s -> elision c ++ assignE p ++ s) "" el ++ maybeEl elision r
+
+elision (Elision x) = showl x
+
+objectLit (ObjectLit l x r) = showb l ++ maybe "" propertyNameAndValueList x ++ showb r
+
+propertyNameAndValueList (PropertyList x) = foldr (\(p, c, e, s) str -> showb p ++ showb c ++ assignE e ++ maybe "" showb s ++ str) "" x

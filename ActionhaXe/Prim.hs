@@ -67,6 +67,7 @@ xml' = mytoken $ \t -> case tokenItem t of
 num = mylexeme $ num'
 str = mylexeme $ str'
 reg = mylexeme $ reg'
+xml = mylexeme $ xml'
 
 mid i = mylexeme $ mid' i
 kw k = mylexeme $ kw' k
