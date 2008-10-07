@@ -40,7 +40,7 @@ inClassBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- memberVarDecl; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
 
-methodBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
+funcBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inMethodBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
@@ -67,7 +67,7 @@ classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 
 classImplements = do{ k <- kw "implements"; s <- sepByCI1 nident (op ","); return $ k:s}
 
-methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- methodBlock; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
+methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- optionMaybe funcBlock; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
 
 methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
     where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]
@@ -129,8 +129,8 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- objectLit; return $ PEObject x})
        <|> try(do{ x <- reg; return $ PERegex x})
        <|> try(do{ x <- xml; return $ PEXml x})
--- need to add function
-       <|> do{ l <- op "("; x <- expr; r <- op ")"; return $ PEParens l x r} -- need to add commas
+       <|> try(do{ x <- func; return $ PEFunc x})
+       <|> do{ l <- op "("; x <- expr; r <- op ")"; return $ PEParens l x r} -- avoid commas
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
        <|> do{ l <- op "["; e <- optionMaybe elision; r <- op "]"; return $ ArrayLitC l e r}
@@ -150,3 +150,4 @@ propertyNameAndValueList = do{ x <- many1 (do{ p <- propertyName; c <- op ":"; e
 
 propertyName = do{ x <- choice [ident, str, num]; return x}
 
+func = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; sig <- signature; b <- funcBlock; exitScope; return $ FuncExpr f i sig b}

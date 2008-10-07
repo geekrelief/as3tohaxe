@@ -45,6 +45,7 @@ data PrimaryE = PEThis CToken                     -- this
               | PEObject ObjectLit                -- {, maybe [[property : assignE],[,]] , }
               | PERegex  CToken
               | PEXml CToken
+              | PEFunc FuncExpr
               | PEParens CToken BlockItem CToken  -- (, PrimaryE, )
     deriving (Show)
 
@@ -67,13 +68,15 @@ data ObjectLit = ObjectLit CToken (Maybe PropertyList) CToken deriving (Show)
 
 data PropertyList = PropertyList [(CToken, CToken, AssignE, (Maybe CToken))]  deriving (Show) -- [propertyName, :, assignE, maybe ',']
 
+data FuncExpr = FuncExpr CToken (Maybe CToken) Signature BlockItem deriving (Show) -- function, maybe ident, signature, block
+
 data BlockItem =  Tok        CToken
                 | Expr       AssignE
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
                 | MemberVarDecl    (Maybe [CToken]) CToken CToken CToken AsType (Maybe [CToken]) Semi -- maybe attributes, var, identifier, :, datatype, maybe( = initialValue), ;
-                | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature BlockItem -- attributes, function, maybe get/set, identifier, Signature, body
+                | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
     deriving (Show)
 

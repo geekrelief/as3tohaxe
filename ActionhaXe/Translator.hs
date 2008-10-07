@@ -62,7 +62,6 @@ block (Block l bs r)  = do
 
 constructorBlock (Block l bs r) = do 
     bi <-  foldrM (\b s -> do{ x <- blockItem b; return $ x ++ s} ) "" bs 
-    --let i = (reverse $ break (\c -> c == '\n') ( reverse $ showw l)) ++ "test"
     let spacebreak = break (\c -> c == '\n') ( reverse $ showw l)
     let i =  reverse $ fst spacebreak
     let nl = if (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
@@ -78,7 +77,7 @@ blockItem b = do x <- case b of  -- Use the list monad here to try all possible 
                         MethodDecl _ _ _ _ _ _      -> do{ x <- methodDecl b; return x} 
                         MemberVarDecl _ _ _ _ _ _ _ -> do{ x <- memberVarDecl b; return x}
                         VarDecl _ _ _ _ _ _         -> do{ return $ varDecl b}
-                        Expr _                      -> do{ return $ expr b}
+                        Expr _                      -> do{ x <- expr b; return x}
                  return x
 
 tok t = do let x = showb t
@@ -105,14 +104,12 @@ methodDecl (MethodDecl a f ac n s b) = do
     className <- getFlag fclass
     classAttr <- getFlag fclassAttr
     if packageName == mainPackage && className == (showd n) && classAttr == "public"
-        then do{ x <- block b; return $ "static " ++ showb f ++ "main() "++ x }
+        then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
-                 then do{ x <- constructorBlock b; return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x }
-                 else do{ x <- block b;  return $ attr a ++ showb f ++ accessor ac ++ showb n ++ signature s ++ x }
+                 then do{ x <- maybe (return "") constructorBlock b; return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x }
+                 else do{ x <- maybe (return "") block b; return $ attr a ++ showb f ++ accessor ac ++ showb n ++ signature s ++ x }
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
-          --inMainAttr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
           accessor ac = maybeEl showb ac
-          funcname n = showb n -- if method has same name as class then replace with new
 
 signatureArgs (Signature l args r ret) = showb l ++ showArgs args  ++ showb r
 
@@ -124,7 +121,6 @@ signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ ret
 
 showArgs as = concat $ map showArg as
     where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
-
 
 memberVarDecl (MemberVarDecl ns v n c d i s) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns || (maybe True (const False) i)
@@ -161,21 +157,28 @@ expr (Expr x) = assignE x
 assignE x = primaryE x
 
 primaryE x = case x of
-                 PEThis x -> showb x
-                 PEIdent x -> showb x
-                 PELit x -> showb x
-                 PEArray x -> arrayLit x
-                 PEObject x -> objectLit x
-                 PERegex x -> "~" ++ showb x
-                 PEXml x -> "Xml.parse(\""++ showd x ++ "\")" ++ showw x
-                 PEParens l x r -> showb l ++ expr x ++ showb r
+                 PEThis x -> do{ return $ showb x}
+                 PEIdent x -> do{ return $ showb x}
+                 PELit x -> do{ return $ showb x}
+                 PEArray x -> do{ r <- arrayLit x; return r}
+                 PEObject x -> do{ r <- objectLit x; return r}
+                 PERegex x -> do{ return $ "~" ++ showb x}
+                 PEXml x -> do{ return $ "Xml.parse(\""++ showd x ++ "\")" ++ showw x}
+                 PEFunc x -> do{ r <- funcExpr x; return r}
+                 PEParens l x r -> do{ v <- expr x; return $ showb l ++ v ++ showb r}
 
-arrayLit (ArrayLitC l x r) = showb l ++ maybe "" elision x ++ showb r
+arrayLit (ArrayLitC l x r) = do{ return $ showb l ++ maybe "" elision x ++ showb r }
 
-elementList (El l e el r) = maybeEl elision l ++ assignE e ++ foldr (\(EAE c p) s -> elision c ++ assignE p ++ s) "" el ++ maybeEl elision r
+arrayLit (ArrayLit l x r) = do{ e <- elementList x; return $ showb l ++ e ++ showb r}
+
+elementList (El l e el r) = do{ es <- assignE e; els <- foldrM (\(EAE c p) s -> do{ ps <- assignE p; return $ elision c ++ ps ++ s}) "" el; return $ maybeEl elision l ++ es ++ els ++ maybeEl elision r }
 
 elision (Elision x) = showl x
 
-objectLit (ObjectLit l x r) = showb l ++ maybe "" propertyNameAndValueList x ++ showb r
+objectLit (ObjectLit l x r) = do{ p <- maybe (return "") propertyNameAndValueList x; return $ showb l ++ p ++ showb r}
 
-propertyNameAndValueList (PropertyList x) = foldr (\(p, c, e, s) str -> showb p ++ showb c ++ assignE e ++ maybe "" showb s ++ str) "" x
+propertyNameAndValueList (PropertyList x) = do
+    p <- foldrM (\(p, c, e, s) str -> do{ ex <- assignE e; return $ showb p ++ showb c ++ ex ++ maybe "" showb s ++ str}) "" x
+    return p
+
+funcExpr (FuncExpr f i s b) = do{ x <- block b; return $ showb f ++ signature s ++ x}

@@ -16,7 +16,15 @@
 							<b/>
 						</a>");
 
-			txt.text = o.red;
+			//txt.text = o.red;
+			var ar:Array<Dynamic> = [1,2,3,4];
+
+			var a:Int = 0;
+            var f:Dynamic = function ():String { return "f";};
+			
+			txt.appendText(a + f());
+
+			addChild(txt);
 			
 			if (o.msg == "hello") {
 				trace("in if block");

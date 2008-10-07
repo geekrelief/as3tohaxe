@@ -16,7 +16,15 @@ package
 							<b/>
 						</a>;
 
-			txt.text = o.red;
+			//txt.text = o.red;
+			var ar:Array = [1,2,3,4];
+
+			var a:int = 0;
+            var f:Function = function lambda():String { return "f";};
+			
+			txt.appendText(a + f());
+
+			addChild(txt);
 			
 			if (o.msg == "hello") {
 				trace("in if block");
