@@ -46,7 +46,7 @@ data PrimaryE = PEThis CToken                     -- this
               | PERegex  CToken
               | PEXml CToken
               | PEFunc FuncExpr
-              | PEParens CToken BlockItem CToken  -- (, PrimaryE, )
+              | PEParens CToken [(PrimaryE, (Maybe CToken))] CToken  -- (, [(PrimaryE, maybe ',')], )
     deriving (Show)
 
 type AssignE = PrimaryE

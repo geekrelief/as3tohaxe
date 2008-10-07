@@ -20,9 +20,11 @@ package
 			var ar:Array = [1,2,3,4];
 
 			var a:int = 0;
+            var i:int = (a);
+
             var f:Function = function lambda():String { return "f";};
 			
-			txt.appendText(a + f());
+			txt.appendText(a+" "+i+" "+ f());
 
 			addChild(txt);
 			

@@ -20,9 +20,11 @@
 			var ar:Array<Dynamic> = [1,2,3,4];
 
 			var a:Int = 0;
+            var i:Int = (a);
+
             var f:Dynamic = function ():String { return "f";};
 			
-			txt.appendText(a + f());
+			txt.appendText(a+" "+i+" "+ f());
 
 			addChild(txt);
 			

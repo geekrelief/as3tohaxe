@@ -130,7 +130,7 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- reg; return $ PERegex x})
        <|> try(do{ x <- xml; return $ PEXml x})
        <|> try(do{ x <- func; return $ PEFunc x})
-       <|> do{ l <- op "("; x <- expr; r <- op ")"; return $ PEParens l x r} -- avoid commas
+       <|> do{ x <- parenExpr; return $ x} 
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
        <|> do{ l <- op "["; e <- optionMaybe elision; r <- op "]"; return $ ArrayLitC l e r}
@@ -151,3 +151,5 @@ propertyNameAndValueList = do{ x <- many1 (do{ p <- propertyName; c <- op ":"; e
 propertyName = do{ x <- choice [ident, str, num]; return x}
 
 func = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; sig <- signature; b <- funcBlock; exitScope; return $ FuncExpr f i sig b}
+
+parenExpr = do{ l <- op "("; e <- many1 (do{x <- assignE; c <- optionMaybe (op ","); return (x, c)}); r <- op ")"; return $ PEParens l e r}
