@@ -154,7 +154,7 @@ datatype d = case d of
 
 expr (Expr x) = assignE x
 
-assignE x = primaryE x
+assignE = postFixE
 
 primaryE x = case x of
                  PEThis x -> do{ return $ showb x}
@@ -165,7 +165,7 @@ primaryE x = case x of
                  PERegex x -> do{ return $ "~" ++ showb x}
                  PEXml x -> do{ return $ "Xml.parse(\""++ showd x ++ "\")" ++ showw x}
                  PEFunc x -> do{ r <- funcE x; return r}
-                 PEParens l x r -> do{ v <- parenE x; return $ showb l ++ v ++ showd r ++ (if length x > 1 then " /*todo as3tohaxe*/ " else "") ++ showw r}
+                 PEParens l x r -> do{ v <- listE x; return $ showb l ++ v ++ showd r ++ showw r}
 
 arrayLit (ArrayLitC l x r) = do{ return $ showb l ++ maybe "" elision x ++ showb r }
 
@@ -183,4 +183,46 @@ propertyNameAndValueList (PropertyList x) = do
 
 funcE (FuncE f i s b) = do{ x <- block b; return $ showb f ++ signature s ++ x}
 
-parenE l = do{ x <- foldrM (\(e, c) s -> do{es <- assignE e; return $ es ++ maybe "" showb c ++ s} ) "" l; return x}
+listE (ListE l) = do{ x <- foldrM (\(e, c) s -> do{es <- assignE e; return $ es ++ maybe "" showb c ++ s} ) "" l; return x}
+
+postFixE x = case x of
+                 PFFull p o     -> do{ p' <- fullPostFixE p; o' <- postFixUp o; return $ p' ++ o'}
+                 PFShortNew p o -> do{ p' <- shortNewE p; o' <- postFixUp o; return $ p' ++ o'}
+    where postFixUp o = return $ maybe "" showb o
+
+fullPostFixE x = case x of
+                    FPFPrimary p sb  -> do{ e <- primaryE p; sub <- foldsub sb; return $ e ++ sub}
+                    FPFFullNew f sb  -> do{ e <- fullNewE f; sub <- foldsub sb; return $ e ++ sub}
+                    FPFSuper s p sb  -> do{ e <- superE s; p' <- propertyOp p; sub <- foldsub sb; return $ e ++ p' ++ sub}
+    where foldsub sb = foldrM (\a b -> do{c <- fullPostFixSubE a; return $ c ++ b}) "" sb 
+
+fullPostFixSubE x = case x of
+                        FPSProperty p -> propertyOp p >>= return
+                        FPSArgs     a -> args a >>= return
+                        FPSQuery    q -> queryOp q >>= return
+
+fullNewE (FN k e a) = do{ e' <- fullNewSubE e; a' <- args a; return $ showb k ++ e' ++ a'}
+
+fullNewSubE x = case x of
+                    FN _ _ _      -> do{ e <- fullNewE x; return e}
+                    FNPrimary e p -> do{ e' <- primaryE e; p' <- foldprop p; return $ e' ++ p'}
+                    FNSuper e p   -> do{ e' <- superE e; p' <- foldprop p; return $ e' ++ p'}
+    where foldprop p = foldrM (\a b -> do{ a' <- propertyOp a; return $ a' ++ b}) "" p
+
+shortNewE (SN k s) = do{ s' <- shortNewSubE s; return $ showb k ++ s'}
+
+shortNewSubE x = case x of
+                     SNSFull e  -> fullNewSubE e >>= return
+                     SNSShort e -> shortNewE e >>= return
+
+superE (SuperE k p) = do{ p' <- maybe (return "") args p; return $ showb k ++ p'}
+
+propertyOp x = case x of
+                   PropertyOp o n  -> return $ showb o ++ showb n
+                   PropertyB l e r -> do{ e' <- listE e; return $ showb l ++ e' ++ showb r }
+
+args (Arguments l e r)  = do{ e' <- maybe (return "") listE e; return $ showb l ++ e' ++ showb r}
+
+queryOp x = case x of
+                QueryOpDD o n    -> return $ showb o ++ showb n
+                QueryOpD o l e r -> do{ e' <- listE e; return $ showb o ++ showb l ++ e' ++ showb r}

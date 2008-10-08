@@ -1,6 +1,7 @@
 -- Translate a file
 
 import ActionhaXe.Lexer
+import ActionhaXe.Data
 import ActionhaXe.Prim
 import ActionhaXe.Parser
 import ActionhaXe.Translator

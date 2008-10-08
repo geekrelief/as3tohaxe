@@ -7,7 +7,7 @@
 --       if
 --       case
 
-module ActionhaXe.Parser(Semi, BlockItem(..), Signature(..), Arg(..), Ast(..), Package(..), parseTokens) where
+module ActionhaXe.Parser(parseTokens) where
 
 import ActionhaXe.Lexer
 import ActionhaXe.Prim
@@ -129,7 +129,7 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- objectLit; return $ PEObject x})
        <|> try(do{ x <- reg; return $ PERegex x})
        <|> try(do{ x <- xml; return $ PEXml x})
-       <|> try(do{ x <- func; return $ PEFunc x})
+       <|> try(do{ x <- funcE; return $ PEFunc x})
        <|> do{ x <- parenE; return $ x} 
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
@@ -150,25 +150,20 @@ propertyNameAndValueList = do{ x <- many1 (do{ p <- propertyName; c <- op ":"; e
 
 propertyName = do{ x <- choice [ident, str, num]; return x}
 
-func = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; sig <- signature; b <- funcBlock; exitScope; return $ FuncE f i sig b}
+funcE = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; s <- signature; b <- funcBlock; exitScope; return $ FuncE f i s b}
 
 parenE = do{ l <- op "("; e <- listE; r <- op ")"; return $ PEParens l e r}
-
-superE = do{ k <- kw "super"; p <- optionMaybe args; return $ SuperE k p}
-
-args = do{ l <- op "("; e <- optionMaybe listE; r <- op ")"; return $ Arguments l e r}
 
 listE = do{ e <- many1 (do{x <- assignE; c <- optionMaybe (op ","); return (x, c)}); return $ ListE e}
 
 
-postFixE = try(do{ x <- fullPostFixE; o <- optionMaybe postFixUp; return $ PFFull x o})
-        <|> do{ x <- shortNewE; o <- optionMaybe postFixUp; return $ PFShortNew x o}
+postFixE = try(do{ x <- fullPostFixE; o <- postFixUp; return $ PFFull x o})
+        <|> do{ x <- shortNewE; o <- postFixUp; return $ PFShortNew x o}
+    where postFixUp = optionMaybe (do{ o <- choice [op "++", op "--"]; return o})
 
 fullPostFixE = try(do{ x <- primaryE; s <- many fullPostFixSubE; return $ FPFPrimary x s})
            <|> try(do{ x <- fullNewE; s <- many fullPostFixSubE; return $ FPFFullNew x s})
            <|> (do{ x <- superE; p <- propertyOp; s <- many fullPostFixSubE; return $ FPFSuper x p s})
-
-postFixUp = do{ o <- choice [op "++", op "--"]; return o}
 
 fullPostFixSubE = try(do{ p <- propertyOp; return $ FPSProperty p})
               <|> try(do{ a <- args; return $ FPSArgs a})
@@ -184,6 +179,10 @@ shortNewE = do{ k <- kw "new"; s <- shortNewSubE; return $ SN k s}
 
 shortNewSubE = try(do{ e <- fullNewSubE; return $ SNSFull e})
            <|> do{ e <- shortNewE; return $ SNSShort e}
+
+superE = do{ k <- kw "super"; p <- optionMaybe args; return $ SuperE k p}
+
+args = do{ l <- op "("; e <- optionMaybe listE; r <- op ")"; return $ Arguments l e r}
 
 propertyOp = try(do{ o <- op "."; n <- idn; return $ PropertyOp o n})
          <|> do{ l <- op "["; e <- listE; r <- op "]"; return $ PropertyB l e r}
