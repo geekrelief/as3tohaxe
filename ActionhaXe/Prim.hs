@@ -64,6 +64,7 @@ xml' = mytoken $ \t -> case tokenItem t of
                            TokenXml x -> Just [t]
                            _ -> Nothing
 
+idn = mylexeme $ id'
 num = mylexeme $ num'
 str = mylexeme $ str'
 reg = mylexeme $ reg'

@@ -164,8 +164,8 @@ primaryE x = case x of
                  PEObject x -> do{ r <- objectLit x; return r}
                  PERegex x -> do{ return $ "~" ++ showb x}
                  PEXml x -> do{ return $ "Xml.parse(\""++ showd x ++ "\")" ++ showw x}
-                 PEFunc x -> do{ r <- funcExpr x; return r}
-                 PEParens l x r -> do{ v <- parenExpr x; return $ showb l ++ v ++ showd r ++ (if length x > 1 then " /*todo as3tohaxe*/ " else "") ++ showw r}
+                 PEFunc x -> do{ r <- funcE x; return r}
+                 PEParens l x r -> do{ v <- parenE x; return $ showb l ++ v ++ showd r ++ (if length x > 1 then " /*todo as3tohaxe*/ " else "") ++ showw r}
 
 arrayLit (ArrayLitC l x r) = do{ return $ showb l ++ maybe "" elision x ++ showb r }
 
@@ -181,6 +181,6 @@ propertyNameAndValueList (PropertyList x) = do
     p <- foldrM (\(p, c, e, s) str -> do{ ex <- assignE e; return $ showb p ++ showb c ++ ex ++ maybe "" showb s ++ str}) "" x
     return p
 
-funcExpr (FuncExpr f i s b) = do{ x <- block b; return $ showb f ++ signature s ++ x}
+funcE (FuncE f i s b) = do{ x <- block b; return $ showb f ++ signature s ++ x}
 
-parenExpr l = do{ x <- foldrM (\(e, c) s -> do{es <- assignE e; return $ es ++ maybe "" showb c ++ s} ) "" l; return x}
+parenE l = do{ x <- foldrM (\(e, c) s -> do{es <- assignE e; return $ es ++ maybe "" showb c ++ s} ) "" l; return x}

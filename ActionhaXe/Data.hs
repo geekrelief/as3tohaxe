@@ -38,6 +38,8 @@ type CToken = (TList, TList) -- compound token with a list for an entity, whites
 
 type Semi = Maybe CToken
 
+type AssignE = PostFixE
+
 data PrimaryE = PEThis CToken                     -- this
               | PEIdent CToken                    -- identifier
               | PELit CToken                      -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
@@ -45,11 +47,12 @@ data PrimaryE = PEThis CToken                     -- this
               | PEObject ObjectLit                -- {, maybe [[property : assignE],[,]] , }
               | PERegex  CToken
               | PEXml CToken
-              | PEFunc FuncExpr
-              | PEParens CToken [(PrimaryE, (Maybe CToken))] CToken  -- (, [(PrimaryE, maybe ',')], )
+              | PEFunc FuncE
+              | PEParens CToken ListE CToken  -- (, List of expressions , )
     deriving (Show)
 
-type AssignE = PrimaryE
+data ListE = ListE [(AssignE, (Maybe CToken))] 
+    deriving (Show)
 
 data ArrayLit = ArrayLitC CToken (Maybe Elision) CToken  -- [, maybe commas, ]
               | ArrayLit  CToken ElementList CToken      -- [, element list, ]
@@ -68,7 +71,49 @@ data ObjectLit = ObjectLit CToken (Maybe PropertyList) CToken deriving (Show)
 
 data PropertyList = PropertyList [(CToken, CToken, AssignE, (Maybe CToken))]  deriving (Show) -- [propertyName, :, assignE, maybe ',']
 
-data FuncExpr = FuncExpr CToken (Maybe CToken) Signature BlockItem deriving (Show) -- function, maybe ident, signature, block
+data FuncE = FuncE CToken (Maybe CToken) Signature BlockItem deriving (Show) -- function, maybe ident, signature, block
+
+data Arguments = Arguments CToken (Maybe ListE) CToken
+    deriving (Show)
+
+data SuperE = SuperE CToken (Maybe Arguments)
+    deriving (Show)
+
+data PostFixE = PFFull FullPostFixE (Maybe CToken)
+              | PFShortNew ShortNewE (Maybe CToken)
+    deriving (Show)
+
+data FullPostFixE = FPFPrimary PrimaryE [FullPostFixSubE]
+                  | FPFFullNew FullNewE [FullPostFixSubE]
+                  | FPFSuper SuperE PropertyOp [FullPostFixSubE]
+                  | FPFInc PostFixE CToken
+                  | FPFDec PostFixE CToken
+    deriving (Show)
+
+data FullPostFixSubE = FPSProperty PropertyOp
+                     | FPSArgs Arguments 
+                     | FPSQuery QueryOp
+    deriving (Show)
+
+data FullNewE = FN CToken FullNewE Arguments
+              | FNPrimary PrimaryE [PropertyOp]
+              | FNSuper SuperE [PropertyOp]
+    deriving (Show)
+
+data ShortNewE = SN CToken ShortNewSubE
+    deriving (Show)
+
+data ShortNewSubE = SNSFull FullNewE
+                  | SNSShort ShortNewE
+    deriving (Show)
+
+data PropertyOp = PropertyOp CToken CToken  -- . , identifier
+                | PropertyB CToken ListE CToken -- [ list expression ]
+    deriving (Show)
+
+data QueryOp = QueryOpDD CToken CToken
+             | QueryOpD CToken CToken ListE CToken
+    deriving (Show)
 
 data BlockItem =  Tok        CToken
                 | Expr       AssignE

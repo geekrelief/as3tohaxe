@@ -118,10 +118,10 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
 
 expr = do{ x <- assignE; return $ Expr x}
 
-assignE = primaryE
+assignE = postFixE
 
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
-       <|> try(do{ x <- nident; return $ PEIdent x})
+       <|> try(do{ x <- idn; return $ PEIdent x})
        <|> try(do{ x <- choice[(kw "null"), (kw "true"), (kw "false"), (kw "public"), (kw "private"), (kw "protected"), (kw "internal")]; return $ PELit x})
        <|> try(do{ x <- str; return $ PELit x})
        <|> try(do{ x <- num; return $ PELit x})
@@ -130,7 +130,7 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- reg; return $ PERegex x})
        <|> try(do{ x <- xml; return $ PEXml x})
        <|> try(do{ x <- func; return $ PEFunc x})
-       <|> do{ x <- parenExpr; return $ x} 
+       <|> do{ x <- parenE; return $ x} 
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
        <|> do{ l <- op "["; e <- optionMaybe elision; r <- op "]"; return $ ArrayLitC l e r}
@@ -150,6 +150,44 @@ propertyNameAndValueList = do{ x <- many1 (do{ p <- propertyName; c <- op ":"; e
 
 propertyName = do{ x <- choice [ident, str, num]; return x}
 
-func = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; sig <- signature; b <- funcBlock; exitScope; return $ FuncExpr f i sig b}
+func = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; sig <- signature; b <- funcBlock; exitScope; return $ FuncE f i sig b}
 
-parenExpr = do{ l <- op "("; e <- many1 (do{x <- assignE; c <- optionMaybe (op ","); return (x, c)}); r <- op ")"; return $ PEParens l e r}
+parenE = do{ l <- op "("; e <- listE; r <- op ")"; return $ PEParens l e r}
+
+superE = do{ k <- kw "super"; p <- optionMaybe args; return $ SuperE k p}
+
+args = do{ l <- op "("; e <- optionMaybe listE; r <- op ")"; return $ Arguments l e r}
+
+listE = do{ e <- many1 (do{x <- assignE; c <- optionMaybe (op ","); return (x, c)}); return $ ListE e}
+
+
+postFixE = try(do{ x <- fullPostFixE; o <- optionMaybe postFixUp; return $ PFFull x o})
+        <|> do{ x <- shortNewE; o <- optionMaybe postFixUp; return $ PFShortNew x o}
+
+fullPostFixE = try(do{ x <- primaryE; s <- many fullPostFixSubE; return $ FPFPrimary x s})
+           <|> try(do{ x <- fullNewE; s <- many fullPostFixSubE; return $ FPFFullNew x s})
+           <|> (do{ x <- superE; p <- propertyOp; s <- many fullPostFixSubE; return $ FPFSuper x p s})
+
+postFixUp = do{ o <- choice [op "++", op "--"]; return o}
+
+fullPostFixSubE = try(do{ p <- propertyOp; return $ FPSProperty p})
+              <|> try(do{ a <- args; return $ FPSArgs a})
+              <|> do{ q <- queryOp; return $ FPSQuery q}
+
+fullNewE = do{ k <- kw "new"; e <- fullNewSubE; a <- args; return $ FN k e a}
+
+fullNewSubE = try(do{ e <- fullNewE; return e})
+          <|> try(do{ e <- primaryE; p <- many propertyOp; return $ FNPrimary e p})
+          <|> do{ e <- superE; p <- many1 propertyOp; return $ FNSuper e p}
+
+shortNewE = do{ k <- kw "new"; s <- shortNewSubE; return $ SN k s}
+
+shortNewSubE = try(do{ e <- fullNewSubE; return $ SNSFull e})
+           <|> do{ e <- shortNewE; return $ SNSShort e}
+
+propertyOp = try(do{ o <- op "."; n <- idn; return $ PropertyOp o n})
+         <|> do{ l <- op "["; e <- listE; r <- op "]"; return $ PropertyB l e r}
+
+queryOp = try(do{ o <- op ".."; n <- nident; return $ QueryOpDD o n})
+      <|> do{ o <- op "."; l <- op "("; e <- listE; r <- op ")"; return $ QueryOpD o l e r}
+
