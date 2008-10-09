@@ -38,7 +38,7 @@ type CToken = (TList, TList) -- compound token with a list for an entity, whites
 
 type Semi = Maybe CToken
 
-type AssignE = UnaryE
+type AssignE = AritE
 
 data PrimaryE = PEThis CToken                     -- this
               | PEIdent CToken                    -- identifier
@@ -125,6 +125,10 @@ data UnaryE = UEPrimary PostFixE
             | UEMinus CToken UnaryE
             | UEBitNot CToken UnaryE
             | UENot CToken UnaryE
+    deriving (Show)
+
+data AritE = AEUnary UnaryE
+           | AEBinary CToken AritE AritE
     deriving (Show)
 
 data BlockItem =  Tok        CToken

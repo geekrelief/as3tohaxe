@@ -55,7 +55,7 @@ data TokenType =
 
 keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue", "default",
              "delete", "do", "else", "extends", "false", "finally", "for", "function", "if",
-             "implements", "import", "internal", "is", "native", "new", "null", "package", 
+             "implements", "import", "in", "instanceof", "internal", "is", "native", "new", "null", "package", 
              "private", "protected", "public", "return", "super", "switch", "this", "throw", 
              "to", "true", "try", "typeof", "use", "undefined", "var", "void", "while", "with",
 -- syntactic keywords

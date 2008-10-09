@@ -15,6 +15,7 @@ import ActionhaXe.Data
 import Text.Parsec
 import Text.Parsec.Combinator
 import Text.Parsec.Perm
+import Text.Parsec.Expr
 
 emptyctok = ([],[])
 
@@ -118,7 +119,7 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
 
 expr = do{ x <- assignE; return $ Expr x}
 
-assignE = unaryE
+assignE = aritEIn
 
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- idn; return $ PEIdent x})
@@ -200,3 +201,23 @@ unaryE = try(do{ k <- kw "delete"; p <- postFixE; return $ UEDelete k p})
      <|> try(do{ o <- op "!"; p <- unaryE; return $ UENot o p})
      <|> do{ p <- postFixE; return $ UEPrimary p }
 
+aeUnary = do{ x <- unaryE; return $ AEUnary x}
+
+aritEIn = buildExpressionParser (aritOpTable True) aeUnary
+
+aritENoIn = buildExpressionParser (aritOpTable False) aeUnary
+
+aritOpTable allowIn =
+    [
+     [o "*", o "/", o "%"],                     -- multiplicative
+     [o "+", o "-"],                             -- additive
+     [o "<<", o ">>", o ">>>"],                 -- shift
+     [o "<", o ">", o "<=", o ">="] 
+         ++ (if allowIn == True then [ok "in"] else []) 
+         ++ [ ok "instanceof", ok "is", ok "as"],   -- relational
+     [o "==", o "!=", o "===", o "!=="],       -- equality
+     [o "&"], [o "^"], [o "|"],                 -- bitwise
+     [o "&&"], [o "||"]                          -- logical
+    ]
+    where o opr = Infix (do{ o' <- op opr; return (\x y -> AEBinary o' x y)}) AssocLeft
+          ok kop = Infix (do{ k <- kw kop; return (\x y -> AEBinary k x y)}) AssocLeft
