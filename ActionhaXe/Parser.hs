@@ -118,7 +118,7 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
 
 expr = do{ x <- assignE; return $ Expr x}
 
-assignE = postFixE
+assignE = unaryE
 
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- idn; return $ PEIdent x})
@@ -156,7 +156,6 @@ parenE = do{ l <- op "("; e <- listE; r <- op ")"; return $ PEParens l e r}
 
 listE = do{ e <- many1 (do{x <- assignE; c <- optionMaybe (op ","); return (x, c)}); return $ ListE e}
 
-
 postFixE = try(do{ x <- fullPostFixE; o <- postFixUp; return $ PFFull x o})
         <|> do{ x <- shortNewE; o <- postFixUp; return $ PFShortNew x o}
     where postFixUp = optionMaybe (do{ o <- choice [op "++", op "--"]; return o})
@@ -189,4 +188,15 @@ propertyOp = try(do{ o <- op "."; n <- idn; return $ PropertyOp o n})
 
 queryOp = try(do{ o <- op ".."; n <- nident; return $ QueryOpDD o n})
       <|> do{ o <- op "."; l <- op "("; e <- listE; r <- op ")"; return $ QueryOpD o l e r}
+
+unaryE = try(do{ k <- kw "delete"; p <- postFixE; return $ UEDelete k p})
+     <|> try(do{ k <- kw "void"; p <- postFixE; return $ UEVoid k p})
+     <|> try(do{ k <- kw "typeof"; p <- postFixE; return $ UETypeof k p})
+     <|> try(do{ o <- op "++"; p <- postFixE; return $ UEInc o p})
+     <|> try(do{ o <- op "--"; p <- postFixE; return $ UEDec o p})
+     <|> try(do{ o <- op "+"; p <- unaryE; return $ UEPlus o p})
+     <|> try(do{ o <- op "-"; p <- unaryE; return $ UEMinus o p})
+     <|> try(do{ o <- op "~"; p <- unaryE; return $ UEBitNot o p})
+     <|> try(do{ o <- op "!"; p <- unaryE; return $ UENot o p})
+     <|> do{ p <- postFixE; return $ UEPrimary p }
 

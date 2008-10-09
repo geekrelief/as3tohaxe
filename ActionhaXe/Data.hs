@@ -38,7 +38,7 @@ type CToken = (TList, TList) -- compound token with a list for an entity, whites
 
 type Semi = Maybe CToken
 
-type AssignE = PostFixE
+type AssignE = UnaryE
 
 data PrimaryE = PEThis CToken                     -- this
               | PEIdent CToken                    -- identifier
@@ -113,6 +113,18 @@ data PropertyOp = PropertyOp CToken CToken  -- . , identifier
 
 data QueryOp = QueryOpDD CToken CToken
              | QueryOpD CToken CToken ListE CToken
+    deriving (Show)
+
+data UnaryE = UEPrimary PostFixE
+            | UEDelete CToken PostFixE
+            | UEVoid CToken PostFixE
+            | UETypeof CToken PostFixE
+            | UEInc CToken PostFixE
+            | UEDec CToken PostFixE
+            | UEPlus CToken UnaryE
+            | UEMinus CToken UnaryE
+            | UEBitNot CToken UnaryE
+            | UENot CToken UnaryE
     deriving (Show)
 
 data BlockItem =  Tok        CToken
