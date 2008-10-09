@@ -1,3 +1,7 @@
 Translate
 template
 *.swf
+*.hi
+*.o
+*.swp
+*.hx

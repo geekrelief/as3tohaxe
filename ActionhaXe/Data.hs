@@ -4,6 +4,7 @@ import ActionhaXe.Lexer
 import Text.Parsec
 import Text.Parsec.Prim
 
+import Data.Char
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -31,14 +32,18 @@ shown x = tailAtN $ snd $ break (== '\n') $ foldr (\t s -> (tokenItemS t) ++ s) 
 
 showl :: [CToken] -> String
 showl xs = foldr (\t s -> showb t ++ s) "" xs
+
+splitLR :: String -> [String]
+splitLR x = [l, m, r]
+    where (l, nl) = span (\c -> isSpace c || c == '\n') x
+          (r') = span (\c -> isSpace c || c == '\n') $ reverse nl
+          (m, r) = (reverse $ snd r', reverse $ fst r')
  
 type Name = String
 type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
 
 type Semi = Maybe CToken
-
-type AssignE = AritE
 
 data PrimaryE = PEThis CToken                     -- this
               | PEIdent CToken                    -- identifier
@@ -129,6 +134,18 @@ data UnaryE = UEPrimary PostFixE
 
 data AritE = AEUnary UnaryE
            | AEBinary CToken AritE AritE
+    deriving (Show)
+
+data CondE = CondE AritE (Maybe (CToken, AssignE, CToken, AssignE))
+    deriving (Show)
+
+data NAssignE = NAssignE AritE (Maybe (CToken, NAssignE, CToken, NAssignE))
+    deriving (Show)
+
+data AssignE = ACond CondE
+             | AAssign PostFixE CToken AssignE
+             | ACompound PostFixE CToken AssignE
+             | ALogical PostFixE CToken AssignE
     deriving (Show)
 
 data BlockItem =  Tok        CToken

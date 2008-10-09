@@ -117,10 +117,6 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
 -- Vector.<*> new in flash 10
        <|> do{ i <- ident; return $ AsTypeUser i}
 
-expr = do{ x <- assignE; return $ Expr x}
-
-assignE = aritEIn
-
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- idn; return $ PEIdent x})
        <|> try(do{ x <- choice[(kw "null"), (kw "true"), (kw "false"), (kw "public"), (kw "private"), (kw "protected"), (kw "internal")]; return $ PELit x})
@@ -166,7 +162,7 @@ fullPostFixE = try(do{ x <- primaryE; s <- many fullPostFixSubE; return $ FPFPri
            <|> (do{ x <- superE; p <- propertyOp; s <- many fullPostFixSubE; return $ FPFSuper x p s})
 
 fullPostFixSubE = try(do{ p <- propertyOp; return $ FPSProperty p})
-              <|> try(do{ a <- args; return $ FPSArgs a})
+              <|> try(do{ a <- args; return $ FPSArgs a})  -- call expression
               <|> do{ q <- queryOp; return $ FPSQuery q}
 
 fullNewE = do{ k <- kw "new"; e <- fullNewSubE; a <- args; return $ FN k e a}
@@ -203,7 +199,7 @@ unaryE = try(do{ k <- kw "delete"; p <- postFixE; return $ UEDelete k p})
 
 aeUnary = do{ x <- unaryE; return $ AEUnary x}
 
-aritEIn = buildExpressionParser (aritOpTable True) aeUnary
+aritE = buildExpressionParser (aritOpTable True) aeUnary
 
 aritENoIn = buildExpressionParser (aritOpTable False) aeUnary
 
@@ -221,3 +217,25 @@ aritOpTable allowIn =
     ]
     where o opr = Infix (do{ o' <- op opr; return (\x y -> AEBinary o' x y)}) AssocLeft
           ok kop = Infix (do{ k <- kw kop; return (\x y -> AEBinary k x y)}) AssocLeft
+
+condE = do{ e <- aritE; o <- optionMaybe (do{ q <- op "?"; e1 <- assignE; c <- op ":"; e2 <- assignE; return $ (q, e1, c, e2)}); return $ CondE e o}
+
+condENoIn = do{ e <- aritENoIn; o <- optionMaybe (do{ q <- op "?"; e1 <- assignENoIn; c <- op ":"; e2 <- assignENoIn; return $ (q, e1, c, e2)}); return $ CondE e o}
+
+nonAssignE = do{ e <- aritE; o <- optionMaybe (do{ q <- op "?"; e1 <- nonAssignE; c <- op ":"; e2 <- nonAssignE; return $ (q, e1, c, e2)}); return $ NAssignE e o}
+
+nonAssignENoIn = do{ e <- aritENoIn; o <- optionMaybe (do{ q <- op "?"; e1 <- nonAssignENoIn; c <- op ":"; e2 <- nonAssignENoIn; return $ (q, e1, c, e2)}); return $ NAssignE e o}
+
+assignE = try(do{ p <- postFixE; o <- choice [op "&&=", op "^^=", op "||="]; a <- assignE; return $ ALogical p o a})
+      <|> try(do{ p <- postFixE; o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignE; return $ ACompound p o a})
+      <|> try(do{ p <- postFixE; o <- op "="; a <- assignE; return $ AAssign p o a})
+      <|> do{ e <- condE; return $ ACond e}
+
+assignENoIn = try(do{ p <- postFixE; o <- choice [op "&&=", op "^^=", op "||="]; a <- assignENoIn; return $ ALogical p o a})
+      <|> try(do{ p <- postFixE; o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignENoIn; return $ ACompound p o a})
+      <|> try(do{ p <- postFixE; o <- op "="; a <- assignENoIn; return $ AAssign p o a})
+      <|> do{ e <- condE; return $ ACond e}
+
+expr = do{ x <- assignE; return $ Expr x}
+
+exprNoIn = do{ x <- assignENoIn; return $ Expr x}

@@ -152,10 +152,6 @@ datatype d = case d of
                  AsTypeRest -> "Array<Dynamic>"
                  AsTypeUser n -> showb n
 
-expr (Expr x) = assignE x
-
-assignE = postFixE
-
 primaryE x = case x of
                  PEThis x -> do{ return $ showb x}
                  PEIdent x -> do{ return $ showb x}
@@ -226,3 +222,33 @@ args (Arguments l e r)  = do{ e' <- maybe (return "") listE e; return $ showb l 
 queryOp x = case x of
                 QueryOpDD o n    -> return $ showb o ++ showb n
                 QueryOpD o l e r -> do{ e' <- listE e; return $ showb o ++ showb l ++ e' ++ showb r}
+
+unaryE x = case x of
+               UEDelete k p   -> do{ p' <- postFixE p; return $ showb k ++ p'}
+               UEVoid k p     -> do{ p' <- postFixE p; return $ showb k ++ p'}
+               UETypeof k p   -> do{ p' <- postFixE p; return $ showb k ++ p'}
+               UEInc o p      -> do{ p' <- postFixE p; return $ showb o ++ p'}
+               UEDec o p      -> do{ p' <- postFixE p; return $ showb o ++ p'}
+               UEPlus o p     -> do{ p' <- unaryE p; return $ showb o ++ p'}
+               UEMinus o p    -> do{ p' <- unaryE p; return $ showb o ++ p'}
+               UEBitNot o p   -> do{ p' <- unaryE p; return $ showb o ++ p'}
+               UENot o p      -> do{ p' <- unaryE p; return $ showb o ++ p'}
+               UEPrimary p    -> postFixE p >>= return
+
+aritE x = case x of
+              AEUnary u  -> unaryE u >>= return
+              AEBinary _ _ _ -> binaryE x >>= return 
+
+binaryE (AEBinary o x y)  
+	| showd o == "as" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "cast( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
+    | otherwise       = do{ x' <- aritE x; y' <- aritE y; return $ x' ++ showb o ++ y'}
+
+condE (CondE e o) = do{ e' <- aritE e; o' <- maybe (return "") (\(q, e1, c, e2) -> do{ e1' <- assignE e1; e2' <- assignE e2; return $ showb q ++ e1' ++ showb c ++ e2'}) o; return $ e' ++ o'}
+
+assignE x = case x of
+                ALogical p o a  -> do{ p' <- postFixE p; a' <- assignE a; return $ p' ++ showb o ++ a' } 
+                ACompound p o a -> do{ p' <- postFixE p; a' <- assignE a; return $ p' ++ showb o ++ a' } 
+                AAssign p o a   -> do{ p' <- postFixE p; a' <- assignE a; return $ p' ++ showb o ++ a' } 
+                ACond e         -> condE e >>= return
+
+expr (Expr x) = assignE x
