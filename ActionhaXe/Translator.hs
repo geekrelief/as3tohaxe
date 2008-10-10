@@ -181,6 +181,8 @@ funcE (FuncE f i s b) = do{ x <- block b; return $ showb f ++ signature s ++ x}
 
 listE (ListE l) = do{ x <- foldrM (\(e, c) s -> do{es <- assignE e; return $ es ++ maybe "" showb c ++ s} ) "" l; return x}
 
+listENoIn = listE
+
 postFixE x = case x of
                  PFFull p o     -> do{ p' <- fullPostFixE p; o' <- postFixUp o; return $ p' ++ o'}
                  PFShortNew p o -> do{ p' <- shortNewE p; o' <- postFixUp o; return $ p' ++ o'}
@@ -239,16 +241,29 @@ aritE x = case x of
               AEUnary u  -> unaryE u >>= return
               AEBinary _ _ _ -> binaryE x >>= return 
 
+aritENoIn = aritE
+
 binaryE (AEBinary o x y)  
 	| showd o == "as" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "cast( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
     | otherwise       = do{ x' <- aritE x; y' <- aritE y; return $ x' ++ showb o ++ y'}
 
 condE (CondE e o) = do{ e' <- aritE e; o' <- maybe (return "") (\(q, e1, c, e2) -> do{ e1' <- assignE e1; e2' <- assignE e2; return $ showb q ++ e1' ++ showb c ++ e2'}) o; return $ e' ++ o'}
 
+condENoIn = condE
+
+nonAssignE (NAssignE e o) = do{ e' <- aritE e; o' <- maybe (return "") (\(q, e1, c, e2) -> do{ e1' <- nonAssignE e1; e2' <- nonAssignE e2; return $ showb q ++ e1' ++ showb c ++ e2'}) o; return $ e' ++ o'}
+
+nonAssignENoIn = nonAssignE
+
 assignE x = case x of
                 ALogical p o a  -> do{ p' <- postFixE p; a' <- assignE a; return $ p' ++ showb o ++ a' } 
                 ACompound p o a -> do{ p' <- postFixE p; a' <- assignE a; return $ p' ++ showb o ++ a' } 
                 AAssign p o a   -> do{ p' <- postFixE p; a' <- assignE a; return $ p' ++ showb o ++ a' } 
                 ACond e         -> condE e >>= return
+
+assignENoIn = assignE
+
+typeE = nonAssignE
+typeENoIn = nonAssignENoIn
 
 expr (Expr x) = assignE x

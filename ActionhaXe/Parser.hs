@@ -88,8 +88,8 @@ defval' = try( do{ x <- kw "null"; return x})
       <|> try( do{ x <- str; return x})
       <|> do{ x <- num; return x}
 
-varDecl = do{ ns <- optionMaybe(varAttributes); k <- try(kw "var") <|> (kw "const"); n <- nident; c <- op ":"; dt <- datatype; s <- maybeSemi; storeVar n dt; return $ VarDecl ns k n c dt s}
-varAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
+varDecl = do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const"]; n <- nident; c <- op ":"; dt <- datatype; s <- maybeSemi; storeVar n dt; return $ VarDecl ns k n c dt s}
+varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
 
 memberVarDecl = do{ ns <- optionMaybe(varAttributes)
@@ -225,6 +225,10 @@ condENoIn = do{ e <- aritENoIn; o <- optionMaybe (do{ q <- op "?"; e1 <- assignE
 nonAssignE = do{ e <- aritE; o <- optionMaybe (do{ q <- op "?"; e1 <- nonAssignE; c <- op ":"; e2 <- nonAssignE; return $ (q, e1, c, e2)}); return $ NAssignE e o}
 
 nonAssignENoIn = do{ e <- aritENoIn; o <- optionMaybe (do{ q <- op "?"; e1 <- nonAssignENoIn; c <- op ":"; e2 <- nonAssignENoIn; return $ (q, e1, c, e2)}); return $ NAssignE e o}
+
+typeE = nonAssignE
+
+typeENoIn = nonAssignENoIn
 
 assignE = try(do{ p <- postFixE; o <- choice [op "&&=", op "^^=", op "||="]; a <- assignE; return $ ALogical p o a})
       <|> try(do{ p <- postFixE; o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignE; return $ ACompound p o a})

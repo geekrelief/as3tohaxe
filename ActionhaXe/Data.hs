@@ -148,8 +148,12 @@ data AssignE = ACond CondE
              | ALogical PostFixE CToken AssignE
     deriving (Show)
 
+data Statement = Blank
+    deriving (Show)
+
 data BlockItem =  Tok        CToken
                 | Expr       AssignE
+                | Statement  Statement
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
