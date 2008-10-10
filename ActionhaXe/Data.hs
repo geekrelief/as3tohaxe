@@ -7,8 +7,6 @@ import Text.Parsec.Prim
 import Data.Char
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Tree
 
 
@@ -157,9 +155,11 @@ data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
-                | MemberVarDecl    (Maybe [CToken]) CToken CToken CToken AsType (Maybe [CToken]) Semi -- maybe attributes, var, identifier, :, datatype, maybe( = initialValue), ;
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
-                | VarDecl    (Maybe [CToken]) CToken CToken CToken AsType Semi -- maybe attributes, var, identifier, :, datatype, ;
+                | VarDecl    (Maybe [CToken]) CToken [VarBinding] Semi -- maybe attributes, var, varbindings, ;
+    deriving (Show)
+
+data VarBinding = VarBinding CToken CToken AsType (Maybe (CToken, AssignE)) (Maybe CToken) -- identifier, :, datatype, (maybe (=, assignE)), maybe ','
     deriving (Show)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
@@ -206,11 +206,12 @@ type AsDefTuple = (AsDef, AsDefInfo)
 
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
-data AsState = AsState{ curId::Int, flags::Map String String, initMembers::Set String, path::[Int], scopes::Tree AsStateEl }
+
+data AsState = AsState{ curId::Int, flags::Map String String, initMembers::[String], path::[Int], scopes::Tree AsStateEl }
     deriving (Show)
 
 initState :: AsState
-initState = AsState{ curId = 0, path = [0], flags = Map.empty, initMembers = Set.empty, scopes = newScope 0}
+initState = AsState{ curId = 0, path = [0], flags = Map.empty, initMembers = [], scopes = newScope 0}
 
 enterScope :: AsParser ()
 enterScope = do x <- getState

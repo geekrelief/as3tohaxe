@@ -8,8 +8,6 @@ import ActionhaXe.Prim
 import ActionhaXe.Parser
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Control.Monad.State
 import Data.Foldable (foldlM, foldrM)
 import Data.List (intercalate)
@@ -32,13 +30,13 @@ getFlag flag = do st <- get
                   return mval
 
 insertInitMember output = do st <- get
-                             put st{initMembers = Set.insert output (initMembers st)}
+                             put st{initMembers = (output:(initMembers st))}
                              st' <- get
                              return ()
 
 getMembers = do st <- get
-                let ret = Set.toList (initMembers st)
-                put st{initMembers = Set.empty}
+                let ret = reverse $ initMembers st
+                put st{initMembers = []}
                 return ret
 
 --translateAs3Ast :: Package -> StateT AsState IO String
@@ -53,8 +51,13 @@ program (Package w p n b) = do case n of
                                  Nothing   -> do{ updateFlag fpackage mainPackage; x <-packageBlock b; return $ showb w ++ showw p ++ x}
 
 packageBlock (Block l bs r)  = do 
-    bi <- foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
+    bi <- foldlM (\s b -> do{ x <- packageBlockItem b; return $ s ++ x} ) "" bs 
     return $ showw l ++ bi
+
+classBlock (Block l bs r)  = do 
+    bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
+    return $ showb l ++ bi ++ showb r
+
 
 block (Block l bs r)  = do 
     bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
@@ -69,16 +72,30 @@ constructorBlock (Block l bs r) = do
     let init = "// initialized members"++nl++i++ intercalate (nl++i) x
     return $ showb l ++ init ++ nl ++ i ++ bi ++ showb r
 
-blockItem b = do x <- case b of  -- Use the list monad here to try all possible paths?
-                        Tok t                       -> do{ x <- tok t; return x}
-                        Block _ _ _                 -> do{ x <- block b; return x} 
-                        ImportDecl _ _ _            -> do{ return $ importDecl b }
-                        ClassDecl _ _ _ _ _ _       -> do{ x <- classDecl b; return x}
-                        MethodDecl _ _ _ _ _ _      -> do{ x <- methodDecl b; return x} 
-                        MemberVarDecl _ _ _ _ _ _ _ -> do{ x <- memberVarDecl b; return x}
-                        VarDecl _ _ _ _ _ _         -> do{ return $ varDecl b}
-                        Expr _                      -> do{ x <- expr b; return x}
-                 return x
+packageBlockItem b = 
+    do x <- case b of
+                Tok t                       -> tok t >>= return
+                ImportDecl _ _ _            -> return $ importDecl b
+                ClassDecl _ _ _ _ _ _       -> classDecl b >>= return
+                _                           -> return ""
+       return x
+
+classBlockItem b = 
+    do x <- case b of
+                Tok t                       -> tok t >>= return
+                MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
+                VarDecl _ _ _ _             -> memberVarDecl b >>= return
+                _                           -> return $ show b
+       return x
+
+blockItem b = 
+    do x <- case b of
+                Tok t                       -> tok t >>= return
+                Block _ _ _                 -> block b >>= return
+                VarDecl _ _ _ _             -> varDecl b >>= return
+                Expr _                      -> expr b >>= return
+                _                           -> return ""
+       return x
 
 tok t = do let x = showb t
            f <- getFlag fpackage
@@ -91,9 +108,9 @@ classDecl (ClassDecl a c n e i b) = do
     updateFlag fclassAttr $ publicAttr a
     packageName <- getFlag fpackage
     if packageName == mainPackage
-         then do x <- block b
+         then do x <- classBlock b
                  return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
-         else do x <- block b
+         else do x <- classBlock b
                  return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
           attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
@@ -122,13 +139,20 @@ signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ ret
 showArgs as = concat $ map showArg as
     where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
 
-memberVarDecl (MemberVarDecl ns v n c d i s) = do 
-    if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns || (maybe True (const False) i)
-        then return $ namespace ns ++ "var" ++ showw v ++ showl [n,c] ++ datatype d ++ maybeEl showl i ++ maybeEl showb s 
-        else do insertInitMember (showb n ++ maybeEl showl i ++ ";")
-                return $ namespace ns ++ "var" ++ showw v ++ showl [n,c] ++ datatype d ++ maybeEl showb s
+memberVarDecl (VarDecl ns v b s) = do 
+    if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
+        then do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s }
+        else do{ b' <- foldlM (\s x -> do{ x' <- varBinding x True; return $ s ++ x'}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s }
 
-varDecl (VarDecl ns v n c d s) = namespace ns ++ "var" ++ showw v ++ showl [n,c] ++ datatype d ++ maybeEl showb s
+varDecl (VarDecl ns v b s) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s}
+
+varBinding :: VarBinding -> Bool -> StateT AsState IO String
+varBinding (VarBinding n c d i s) initMember = 
+    do{ i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
+      ; if i' /= "" && initMember
+            then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"; return $ showl [n,c] ++ datatype d ++ maybeEl showb s}
+            else return $ showl [n,c] ++ datatype d ++ i' ++ maybeEl showb s
+      }
 
 namespace ns = case ns of 
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
