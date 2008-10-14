@@ -47,5 +47,8 @@ translateDir dir = do
 
 main = do args <- getArgs
           if isSuffixOf ".as" (args!!0)
-              then translateFile $ args!!0
+              then do
+                       dirExists <- doesDirectoryExist outdir
+                       unless dirExists ((createDirectoryIfMissing True outdir) >> putStrLn ("Created " ++ outdir))
+                       translateFile $ args!!0
               else translateDir $ args!!0
