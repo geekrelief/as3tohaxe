@@ -69,7 +69,7 @@ constructorBlock (Block l bs r) = do
     let i =  reverse $ fst spacebreak
     let nl = if (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
     x <- getMembers
-    let init = "// initialized members"++nl++i++ intercalate (nl++i) x
+    let init = nl++i++ intercalate (nl++i) x
     return $ showb l ++ init ++ nl ++ i ++ bi ++ showb r
 
 packageBlockItem b = 
@@ -84,7 +84,7 @@ classBlockItem b =
     do x <- case b of
                 Tok t                       -> tok t >>= return
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
-                VarS _ _ _ _                -> memberVarS b >>= return
+                VarS _ _ _                  -> memberVarS b >>= return
                 _                           -> return $ show b
        return x
 
@@ -92,7 +92,8 @@ blockItem b =
     do x <- case b of
                 Tok t                       -> tok t >>= return
                 Block _ _ _                 -> block b >>= return
-                VarS _ _ _ _                -> varS b >>= return
+                VarS _ _ _                  -> varS b >>= return
+                ForS _ _ _ _ _ _ _ _ _      -> forS b >>= return
                 Expr _                      -> expr b >>= return
                 _                           -> return ""
        return x
@@ -139,12 +140,12 @@ signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ ret
 showArgs as = concat $ map showArg as
     where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
 
-memberVarS (VarS ns v b s) = do 
+memberVarS (VarS ns v b) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
-        then do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s }
-        else do{ b' <- foldlM (\s x -> do{ x' <- varBinding x True; return $ s ++ x'}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s }
+        then do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
+        else do{ b' <- foldlM (\s x -> do{ x' <- varBinding x True; return $ s ++ x'}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
 
-varS (VarS ns v b s) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s}
+varS (VarS ns v b) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
 
 varBinding :: VarBinding -> Bool -> StateT AsState IO String
 varBinding (VarBinding n c d i s) initMember = 
@@ -291,3 +292,18 @@ typeE = nonAssignE
 typeENoIn = nonAssignENoIn
 
 expr (Expr x) = assignE x
+
+forS (ForS k l finit s e s1 e1 r b) = 
+    do{ fheader <- maybe (return "") forInit finit
+      ; ftest <-  maybe (return "") listE e
+      ; ftail <- maybe (return "") listE e1
+      ; fblock <- forBlock b ftail
+      ; ws <- wsBlock b
+      ; return $ fheader ++ ";" ++ init ws ++ "while " ++ showb l ++ ftest ++ showb r ++ fblock
+      }
+    where forInit i = do case i of
+                             FIListE l -> listE l >>= return
+                             FIVarS v  -> varS v >>= return
+          forBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
+                                           ; return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r }
+          wsBlock (Block l bs r) = return $ showw l
