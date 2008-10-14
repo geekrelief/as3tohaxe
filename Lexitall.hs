@@ -52,7 +52,7 @@ isFile f = do t <- doesFileExist f
               return $ t && ("as" == (map toLower $ reverse $ take 2 $ reverse f))
 
 isDir d = do t <- doesDirectoryExist d
-             return $ t && d /= "." && d /= ".."
+             return $ t && d /= "." && d /= ".." && d /= ".svn"
 
 getASFiles dir = do contents <- getDirectoryContents dir
                     let c = map (\e -> dir++"/"++e) (filter (\d-> d /= "." && d /="..") contents)

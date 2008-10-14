@@ -85,6 +85,8 @@ operator' []     = fail " failed "
 
 operator = operator' $ sortByLength operators
 
+utf8 = do { c <- string "\239\187\191"; return $ TokenWhite c }
+
 simpleSpace = many1 (satisfy (\c -> c == ' ' || c == '\t'))
 whiteSpace = do{ x <- many1 ( try( simpleSpace ) <|>  nl' ); return $ TokenWhite $ concat x}
 
@@ -132,7 +134,8 @@ expPart = do{ e <- oneOf "eE"; i <- signedInt; return $ [e]++i}
 signedInt = do{ s <- optionMaybe (oneOf "+-"); i <- many1 digit; return $ (maybe "" (\x -> [x]) s) ++ i}
 
 atoken = 
-         try (do{ x <- keyword; return x})
+         try (do{ x <- utf8; return x})
+     <|> try (do{ x <- keyword; return x})
      <|> try (do{ x <- commentSLine; return x})
      <|> try (do{ x <- commentMLine; return x})
      <|> try (do{ x <- xmlSTag; return x})

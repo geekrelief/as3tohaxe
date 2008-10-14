@@ -16,6 +16,7 @@ import Control.Monad
 outdir = "hx_output/"
 
 translateFile filename = do
+    putStrLn $ "Translating " ++ filename
     contents <- readFile filename
     let tokens = runLexer "" contents
     program <- case parseTokens filename tokens of
@@ -26,18 +27,19 @@ translateFile filename = do
     writeFile outfilename $ fst trans
 
 isFile f = do t <- doesFileExist f
-              return $ t && ("as" == (map toLower $ reverse $ take 2 $ reverse f))
+              let outfilename = outdir ++ (reverse $ "xh" ++ ( drop 2 $ reverse f))
+              o <- doesFileExist (outfilename)
+              when o $ putStrLn $ "Skipping " ++ f
+              return $ not o && t && ("as" == (map toLower $ reverse $ take 2 $ reverse f))
 
 isDir d = do t <- doesDirectoryExist d
-             return $ t && d /= "." && d /= ".."
-
-ifM f b = if not b then f else return ()
+             return $ t -- && d /= "." && d /= ".." && d /= ".svn"
 
 translateDir dir = do 
     contents <- getDirectoryContents dir
     dirExists <- doesDirectoryExist (outdir ++ dir) 
-    ifM (createDirectoryIfMissing True (outdir++dir)) dirExists
-    let c = map (\e -> dir++"/"++e) (filter (\d-> d /= "." && d /="..") contents)
+    unless dirExists (createDirectoryIfMissing True (outdir++dir) >> putStrLn ("Created " ++ outdir++dir))
+    let c = map (\e -> dir++"/"++e) (filter (\d-> d /= "." && d /=".." && d /= ".svn") contents)
     asfiles <- filterM isFile c
     asdirs <- filterM isDir c
     mapM_ translateFile asfiles
