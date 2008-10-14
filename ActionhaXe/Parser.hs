@@ -37,7 +37,7 @@ classBlock = do{ l <- op "{"; enterScope; x <- inClassBlock; r <- op "}"; exitSc
 
 inClassBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
-      <|> try(do{ x <- varDecl; i <- inClassBlock; return $ [x] ++ i})
+      <|> try(do{ x <- varS; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
 
 funcBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
@@ -45,7 +45,7 @@ funcBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitSc
 inMethodBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
-      <|> try(do{ x <- varDecl; i <- inMethodBlock; return $ [x] ++ i})
+      <|> try(do{ x <- statement; i <- inMethodBlock; return $ [x]++i})
       <|> try(do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
@@ -53,7 +53,7 @@ block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; retur
 inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
-      <|> try(do{ x <- varDecl; i <- inBlock; return $ [x] ++ i})
+      <|> try(do{ x <- statement; i <- inBlock; return $ [x]++i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
@@ -89,7 +89,7 @@ defval' = try( do{ x <- kw "null"; return x})
       <|> try( do{ x <- str; return x})
       <|> do{ x <- num; return x}
 
-varDecl = do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const"]; b <- many1 varBinding; s <- maybeSemi; return $ VarDecl ns k b s}
+varS = do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const"]; b <- many1 varBinding; return $ VarS ns k b }
 
 varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
@@ -146,6 +146,8 @@ funcE = do{ f <- kw "function"; i <- optionMaybe ident; enterScope; s <- signatu
 parenE = do{ l <- op "("; e <- listE; r <- op ")"; return $ PEParens l e r}
 
 listE = do{ e <- many1 (do{x <- assignE; c <- optionMaybe (op ","); return (x, c)}); return $ ListE e}
+
+listENoIn = do{ e <- many1 (do{x <- assignENoIn; c <- optionMaybe (op ","); return (x, c)}); return $ ListE e}
 
 postFixE = try(do{ x <- fullPostFixE; o <- postFixUp; return $ PFFull x o})
         <|> do{ x <- shortNewE; o <- postFixUp; return $ PFShortNew x o}
@@ -227,16 +229,35 @@ typeENoIn = nonAssignENoIn
 assignE = try(do{ p <- postFixE; 
                           try(do{o <- choice [op "&&=", op "^^=", op "||="]; a <- assignE; return $ ALogical p o a})
                       <|> try(do{o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignE; return $ ACompound p o a})
-                      <|> do{ p <- postFixE; o <- op "="; a <- assignE; return $ AAssign p o a}
+                      <|>     do{o <- op "="; a <- assignE; return $ AAssign p o a}
                 }
              )
       <|> do{ e <- condE; return $ ACond e}
 
-assignENoIn = try(do{ p <- postFixE; o <- choice [op "&&=", op "^^=", op "||="]; a <- assignENoIn; return $ ALogical p o a})
-      <|> try(do{ p <- postFixE; o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignENoIn; return $ ACompound p o a})
-      <|> try(do{ p <- postFixE; o <- op "="; a <- assignENoIn; return $ AAssign p o a})
-      <|> do{ e <- condE; return $ ACond e}
+assignENoIn = try(do{ p <- postFixE; 
+                          try(do{o <- choice [op "&&=", op "^^=", op "||="]; a <- assignENoIn; return $ ALogical p o a}) 
+                      <|> try(do{o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignENoIn; return $ ACompound p o a})
+                      <|>     do{o <- op "="; a <- assignENoIn; return $ AAssign p o a}
+                    }
+                 )
+          <|> do{ e <- condE; return $ ACond e}
 
 expr = do{ x <- assignE; return $ Expr x}
 
 exprNoIn = do{ x <- assignENoIn; return $ Expr x}
+
+statement = try(do{ x <- varS; return x})
+        <|> do{ x <- forS; return x}
+
+forS = do{ k <- kw "for"
+         ; l <- op "("
+         ; init <- optionMaybe forInit
+         ; s <- op ";"
+         ; e <- optionMaybe listE
+         ; s1 <- op ";"
+         ; e1 <- optionMaybe listE
+         ; r <- op ")"
+         ; b <- block
+         ; return $ ForS k l init s e s1 e1 r b  }
+    where forInit = try(do{ l <- listENoIn; return $ FIListE l})
+                <|>     do{ x <- varS; return $ FIVarS x}

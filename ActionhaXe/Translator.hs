@@ -84,7 +84,7 @@ classBlockItem b =
     do x <- case b of
                 Tok t                       -> tok t >>= return
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
-                VarDecl _ _ _ _             -> memberVarDecl b >>= return
+                VarS _ _ _ _                -> memberVarS b >>= return
                 _                           -> return $ show b
        return x
 
@@ -92,7 +92,7 @@ blockItem b =
     do x <- case b of
                 Tok t                       -> tok t >>= return
                 Block _ _ _                 -> block b >>= return
-                VarDecl _ _ _ _             -> varDecl b >>= return
+                VarS _ _ _ _                -> varS b >>= return
                 Expr _                      -> expr b >>= return
                 _                           -> return ""
        return x
@@ -139,12 +139,12 @@ signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ ret
 showArgs as = concat $ map showArg as
     where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
 
-memberVarDecl (VarDecl ns v b s) = do 
+memberVarS (VarS ns v b s) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
         then do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s }
         else do{ b' <- foldlM (\s x -> do{ x' <- varBinding x True; return $ s ++ x'}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s }
 
-varDecl (VarDecl ns v b s) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s}
+varS (VarS ns v b s) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b' ++ maybeEl showb s}
 
 varBinding :: VarBinding -> Bool -> StateT AsState IO String
 varBinding (VarBinding n c d i s) initMember = 
