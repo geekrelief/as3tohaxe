@@ -69,7 +69,16 @@ classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 -- need to fix this so it returns a tuple to classDecl
 classImplements = do{ k <- kw "implements"; s <- sepByCI1 nident (op ","); return $ k:s} 
 
-methodDecl = do{ attr <- methodAttributes; k <- kw "function"; acc <- optionMaybe( try(kw "get") <|> (kw "set")); n <- nident; enterScope; sig <- signature; b <- optionMaybe funcBlock; exitScope; storeMethod n; return $ MethodDecl attr k acc n sig b}
+methodDecl = do{ attr <- methodAttributes
+               ; k <- kw "function"
+               ; acc <- optionMaybe( try(kw "get") <|> (kw "set"))
+               ; n <- nident
+               ; enterScope
+               ; sig <- signature
+               ; b <- optionMaybe funcBlock
+               ; exitScope
+               ; storeProperty n acc sig
+               ; return $ MethodDecl attr k acc n sig b}
 
 methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
     where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]

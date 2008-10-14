@@ -183,6 +183,7 @@ type AsParser = Parsec TList AsState
 data AsType = AsType CToken
             | AsTypeRest
             | AsTypeUser CToken
+            | AsTypeUnknown
     deriving (Show, Eq, Ord)
            
 -- Symbol Lookup key
@@ -208,11 +209,38 @@ type AsDefTuple = (AsDef, AsDefInfo)
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
 
-data AsState = AsState{ curId::Int, flags::Map String String, initMembers::[String], path::[Int], scopes::Tree AsStateEl }
+data AsState = AsState{ curId::Int, flags::Map String String, accessors::Map String (AsType, Bool, Bool), initMembers::[String], path::[Int], scopes::Tree AsStateEl }
     deriving (Show)
 
 initState :: AsState
-initState = AsState{ curId = 0, path = [0], flags = Map.empty, initMembers = [], scopes = newScope 0}
+initState = AsState{ curId = 0, path = [0], flags = Map.empty, accessors = Map.empty, initMembers = [], scopes = newScope 0}
+
+getProperty name = 
+    do x <- getState
+       let a = accessors x
+       let def = (AsTypeUnknown, False, False)
+       if (Map.notMember name a) 
+           then do{ let a' = Map.insert name def a
+                  ; let x' = x{ accessors = a' } 
+                  ; setState x'
+                  ; return def
+                  }
+           else Map.lookup name a >>= return
+
+setProperty name prop =
+    do x <- getState
+       let a = accessors x
+       let a' = Map.insert name prop a
+       let x' = x{accessors = a'}
+       setState x'
+
+addGetter name astype = 
+    do prop@(t, g, s) <- getProperty name
+       setProperty name (astype, True, s)
+
+addSetter name astype =
+    do prop@(t, g, s) <- getProperty name
+       setProperty name (astype, g, True)
 
 enterScope :: AsParser ()
 enterScope = do x <- getState
@@ -272,8 +300,16 @@ storePackage p = case p of
 storeClass :: CToken -> AsParser ()
 storeClass c = updateSymbol (DefClass (showd c), DiNone)
 
-storeMethod :: CToken -> AsParser ()
-storeMethod m = updateSymbol (DefFunction (showd m), DiNone)
+--storeProperty :: CToken (Maybe CToken) Signature -> AsParser ()
+storeProperty name (Just acc) s@(Signature l a r o) =
+    do{ case showd acc of
+            "get" -> addGetter (showd name) $ ret o
+            "set" -> addSetter (showd name) $ arg $ head a
+      }
+    where ret (Just (_, t)) = t
+          arg (Arg _ _ t _ _) = t
+
+storeProperty name Nothing s = return ()
 
 storeVar :: CToken -> AsType -> AsParser ()
 storeVar v t = updateSymbol (DefVar (showd v), DiVar t)
