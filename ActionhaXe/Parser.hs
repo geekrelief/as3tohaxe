@@ -224,9 +224,12 @@ typeE = nonAssignE
 
 typeENoIn = nonAssignENoIn
 
-assignE = try(do{ p <- postFixE; o <- choice [op "&&=", op "^^=", op "||="]; a <- assignE; return $ ALogical p o a})
-      <|> try(do{ p <- postFixE; o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignE; return $ ACompound p o a})
-      <|> try(do{ p <- postFixE; o <- op "="; a <- assignE; return $ AAssign p o a})
+assignE = try(do{ p <- postFixE; 
+                          try(do{o <- choice [op "&&=", op "^^=", op "||="]; a <- assignE; return $ ALogical p o a})
+                      <|> try(do{o <- choice [op "*=", op "/=", op "%=", op "+=", op "-=", op "<<=", op ">>=", op ">>>=", op "&=", op "^=", op "|="]; a <- assignE; return $ ACompound p o a})
+                      <|> do{ p <- postFixE; o <- op "="; a <- assignE; return $ AAssign p o a}
+                }
+             )
       <|> do{ e <- condE; return $ ACond e}
 
 assignENoIn = try(do{ p <- postFixE; o <- choice [op "&&=", op "^^=", op "||="]; a <- assignENoIn; return $ ALogical p o a})
