@@ -14,9 +14,13 @@ import Data.Tree
 showd :: CToken -> String
 showd x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
 
--- whitespace
+-- whitespace includes comments
 showw :: CToken -> String
 showw x = foldr (\t s -> (tokenItemS t) ++ s) "" (snd x)
+
+-- whitespace filters comments
+showws :: CToken -> String
+showws x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst (span (\(s, tok) -> case tok of { TokenWhite _ -> True; TokenNl _ -> True; otherwise -> False;}) (snd x)))
 
 -- both data and whitespace
 showb :: CToken -> String

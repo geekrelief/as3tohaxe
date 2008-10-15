@@ -59,12 +59,12 @@ classBlock (Block l bs r)  = do
     x <- get
     let a = accessors x
     let al = Map.toList a
-    let props = foldl (\str (k, (t, g, s)) -> str ++ "public var " ++ k ++ "(" 
+    let props = foldl (\str (k, (t, g, s)) -> str ++ showws l ++ "public var " ++ k ++ "(" 
                                           ++ (if g then "get"++ [toUpper $ head k] ++ tail k else "null") ++ ", "
                                           ++ (if s then "set"++ [toUpper $ head k] ++ tail k else "null") 
-                                          ++ ") : " ++ datatype t ++ ";" ++ showw l) "" al
+                                          ++ ") : " ++ datatype t ++ ";") "" al
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
-    return $ showb l ++ props ++ bi ++ showb r
+    return $ showd l ++ props ++ showw l ++ bi ++ showb r
 
 block (Block l bs r)  = do 
     bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
@@ -128,11 +128,13 @@ methodDecl (MethodDecl a f ac n s b) = do
         then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
                  then do{ x <- maybe (return "") constructorBlock b; return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x }
-                 else do{ x <- maybe (return "") block b
-                        ; st <- get
-                        ; let accMap = accessors st
-                        ; (t, _, _) <- Map.lookup (showd n) accMap
-                        ; return $ attr a ++ showb f ++ accessor ac n s t ++ x }
+                 else do x <- maybe (return "") block b
+                         st <- get
+                         let accMap = accessors st
+                         if Map.member (showd n) accMap
+                              then do (t, _, _) <- Map.lookup (showd n) accMap
+                                      return $ attr a ++ showb f ++ accessor ac n s t ++ x 
+                              else return $ attr a ++ showb f ++ showb n ++ signature s ++ x
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
           accessor ac name s@(Signature l args r ret) t = 
               case ac of
