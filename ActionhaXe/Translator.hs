@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import Control.Monad.State
 import Data.Foldable (foldlM, foldrM)
 import Data.List (intercalate)
+import Data.Char (toUpper, isAlphaNum)
 
 -- flags
 mainPackage = "mainPackage"
@@ -55,9 +56,15 @@ packageBlock (Block l bs r)  = do
     return $ showw l ++ bi
 
 classBlock (Block l bs r)  = do 
+    x <- get
+    let a = accessors x
+    let al = Map.toList a
+    let props = foldl (\str (k, (t, g, s)) -> str ++ "public var " ++ k ++ "(" 
+                                          ++ (if g then "get"++ [toUpper $ head k] ++ tail k else "null") ++ ", "
+                                          ++ (if s then "set"++ [toUpper $ head k] ++ tail k else "null") 
+                                          ++ ") : " ++ datatype t ++ ";" ++ showw l) "" al
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
-    return $ showb l ++ bi ++ showb r
-
+    return $ showb l ++ props ++ bi ++ showb r
 
 block (Block l bs r)  = do 
     bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
@@ -107,12 +114,8 @@ importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybeEl
 classDecl (ClassDecl a c n e i b) = do
     updateFlag fclass $ showd n
     updateFlag fclassAttr $ publicAttr a
-    packageName <- getFlag fpackage
-    if packageName == mainPackage
-         then do x <- classBlock b
-                 return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
-         else do x <- classBlock b
-                 return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
+    x <- classBlock b
+    return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
           attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
           implements is = maybeEl showl is
@@ -125,9 +128,17 @@ methodDecl (MethodDecl a f ac n s b) = do
         then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
                  then do{ x <- maybe (return "") constructorBlock b; return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x }
-                 else do{ x <- maybe (return "") block b; return $ attr a ++ showb f ++ accessor ac ++ showb n ++ signature s ++ x }
+                 else do{ x <- maybe (return "") block b
+                        ; st <- get
+                        ; let accMap = accessors st
+                        ; (t, _, _) <- Map.lookup (showd n) accMap
+                        ; return $ attr a ++ showb f ++ accessor ac n s t ++ x }
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
-          accessor ac = maybeEl showb ac
+          accessor ac name s@(Signature l args r ret) t = 
+              case ac of
+                  Just x -> showd x ++ [toUpper $ head $ showd name] ++ tail (showb name) ++ showb l ++ showArgs args ++ showd r ++ ":" 
+                            ++ fst (datatypet t) ++ (case ret of { Just (c, t) -> snd (datatypet t); Nothing -> showw r})
+                  Nothing -> showb name ++ signature s
 
 signatureArgs (Signature l args r ret) = showb l ++ showArgs args  ++ showb r
 
@@ -158,6 +169,8 @@ varBinding (VarBinding n c d i s) initMember =
 namespace ns = case ns of 
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
                    Nothing -> ""
+
+datatypet d = span isAlphaNum (datatype d)
 
 datatype d = case d of
                  AsType n -> (case (showd n) of

@@ -300,7 +300,6 @@ storePackage p = case p of
 storeClass :: CToken -> AsParser ()
 storeClass c = updateSymbol (DefClass (showd c), DiNone)
 
---storeProperty :: CToken (Maybe CToken) Signature -> AsParser ()
 storeProperty name (Just acc) s@(Signature l a r o) =
     do{ case showd acc of
             "get" -> addGetter (showd name) $ ret o
