@@ -29,13 +29,15 @@ package = do{ w <- startWs; p <- kw "package"; i <- optionMaybe(ident); storePac
 packageBlock = do{ l <- op "{"; enterScope; x <- inPackageBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inPackageBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- metadata; i <- inPackageBlock; return $ [x] ++ i})
       <|> try(do{ x <- importDecl; i <- inPackageBlock; return $ [x] ++ i})
-      <|> try(do{ x <- classDecl; i <- inBlock; return $ [x] ++ i})
+      <|> try(do{ x <- classDecl; i <- inPackageBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inPackageBlock; return $ [(Tok x)] ++ i})
 
 classBlock = do{ l <- op "{"; enterScope; x <- inClassBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inClassBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- metadata; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- varS; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
@@ -43,6 +45,7 @@ inClassBlock = try(do{ lookAhead( op "}"); return [] })
 funcBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inMethodBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- metadata; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
       <|> try(do{ x <- statement; i <- inMethodBlock; return $ [x]++i})
@@ -51,10 +54,17 @@ inMethodBlock = try(do{ lookAhead( op "}"); return [] })
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 
 inBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- metadata; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- statement; i <- inBlock; return $ [x]++i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
+
+metadata = do l <- op "["
+              t <- choice[mid "Event", mid "ArrayElementType", mid "SWF", mid "Embed", mid "Frame"]
+              x <- manyTill anytok (lookAhead(op "]"))
+              r <- op "]"
+              return $ Metadata l t x r
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 

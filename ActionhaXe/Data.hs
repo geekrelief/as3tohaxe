@@ -158,6 +158,7 @@ data BlockItem =  Tok        CToken
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarS       (Maybe [CToken]) CToken [VarBinding] -- maybe attributes, var, varbindings
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}
+                | Metadata CToken CToken [CToken] CToken
     deriving (Show)
 
 data ForInit = FIListE ListE

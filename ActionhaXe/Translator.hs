@@ -84,6 +84,7 @@ packageBlockItem b =
                 Tok t                       -> tok t >>= return
                 ImportDecl _ _ _            -> return $ importDecl b
                 ClassDecl _ _ _ _ _ _       -> classDecl b >>= return
+                Metadata _ _ _ _            -> metadata b >>= return
                 _                           -> return ""
        return x
 
@@ -92,6 +93,7 @@ classBlockItem b =
                 Tok t                       -> tok t >>= return
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
                 VarS _ _ _                  -> memberVarS b >>= return
+                Metadata _ _ _ _            -> metadata b >>= return
                 _                           -> return $ show b
        return x
 
@@ -102,12 +104,15 @@ blockItem b =
                 VarS _ _ _                  -> varS b >>= return
                 ForS _ _ _ _ _ _ _ _ _      -> forS b >>= return
                 Expr _                      -> expr b >>= return
+                Metadata _ _ _ _            -> metadata b >>= return
                 _                           -> return ""
        return x
 
 tok t = do let x = showb t
            f <- getFlag fpackage
            return x
+
+metadata (Metadata l t x r) = do{ return $ "/*" ++ showb l ++ showb t ++ showl x++ showd r ++ "*/" ++ showw r}
 
 importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybeEl showb s  -- look up and adjust
 
