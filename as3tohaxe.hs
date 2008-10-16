@@ -8,10 +8,9 @@ import ActionhaXe.Translator
 import System.Directory
 import System.Environment (getArgs)
 import Control.Monad.State
-
-import Data.Char
-import Data.List
-import Control.Monad
+import System.Exit
+import Data.Char (toUpper, toLower)
+import Data.List (isSuffixOf)
 
 outdir = "hx_output/"
 
@@ -46,6 +45,10 @@ translateDir dir = do
     mapM_ translateDir asdirs
 
 main = do args <- getArgs
+          if length args == 0
+              then do putStrLn "as3tohaxe Copyright (c) 2008 Don-Duong Quach\nUsage: as3tohaxe [directory | filename]\nOutput in hx_output/"
+                      exitWith ExitSuccess
+              else return ()
           if isSuffixOf ".as" (args!!0)
               then do
                        dirExists <- doesDirectoryExist outdir
