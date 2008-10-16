@@ -1,3 +1,20 @@
+{-
+    as3tohaxe - An Actionscript 3 to haXe source file translator
+    Copyright (C) 2008 Don-Duong Quach
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-}
 -- Translate a file
 
 import ActionhaXe.Lexer
@@ -32,7 +49,7 @@ isFile f = do t <- doesFileExist f
               return $ not o && t && ("as" == (map toLower $ reverse $ take 2 $ reverse f))
 
 isDir d = do t <- doesDirectoryExist d
-             return $ t -- && d /= "." && d /= ".." && d /= ".svn"
+             return $ t
 
 translateDir dir = do 
     contents <- getDirectoryContents dir
@@ -46,7 +63,7 @@ translateDir dir = do
 
 main = do args <- getArgs
           if length args == 0
-              then do putStrLn "as3tohaxe Copyright (c) 2008 Don-Duong Quach\nUsage: as3tohaxe [directory | filename]\nOutput in hx_output/"
+              then do putStrLn "as3tohaxe Copyright (c) 2008 Don-Duong Quach\nUsage: as3tohaxe [directory | filename]"
                       exitWith ExitSuccess
               else return ()
           if isSuffixOf ".as" (args!!0)

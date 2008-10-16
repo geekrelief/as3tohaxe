@@ -1,0 +1,32 @@
+as3tohaxe - An Actionscript 3 to haXe source file converter written in Haskell
+Copyright (C) 2008 Don-Duong Quach
+
+For more info check visit: 
+http://geekrelief.wordpress.com
+http://www.github.com/geekrelief/as3tohaxe
+Donations are appreciated!
+
+
+-- Running --
+Type 'as3tohaxe' and a directory or file to convert.  
+A directory named "hx_output" will be created in the current
+directory if necessary.  The supplied ".as" files will be 
+translated into haxe files and stored there.  If the command
+is run more than once, and pre-existing files will be skipped.
+
+-- Binary --
+There is a binary 'as3tohaxe' included for Mac OSX 10.5.
+
+-- Compiling --
+Requirements 
+- The source http://www.github.com/geekrelief/as3tohaxe
+- GHC (tested with 6.8.3) http://www.haskell.org/ghc/
+- Cabal for parsec http://www.haskell.org/cabal/
+- parsec 3 http://hackage.haskell.org/cgi-bin/hackage-scripts/package/parsec
+
+Running: ghc --make as3tohaxe.hs 
+will produce the binary 'as3tohaxe'
+
+-- License --
+This program and its source is GPL licensed.  Please read the LICENSE
+for more details.
