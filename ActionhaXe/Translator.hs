@@ -44,8 +44,10 @@ deleteFlag flag = do st <- get
 
 getFlag :: String -> StateT AsState IO String
 getFlag flag = do st <- get
-                  mval <- Map.lookup flag $ flags st
-                  return mval
+                  if Map.member flag $ flags st
+                      then do mval <- Map.lookup flag $ flags st
+                              return mval
+                      else return ""
 
 insertInitMember output = do st <- get
                              put st{initMembers = (output:(initMembers st))}
@@ -57,11 +59,22 @@ getMembers = do st <- get
                 put st{initMembers = []}
                 return ret
 
---translateAs3Ast :: Package -> StateT AsState IO String
-translateAs3Ast p = do str <- program p
-                       return str
-
 maybeEl f i = maybe "" (\m -> f m) i
+
+--translateAs3Ast :: Ast -> StateT AsState IO String
+translateAs3Ast p = 
+    case p of 
+        AS3Program    x st -> program x >>= return
+        AS3Directives x st -> directives x >>= return
+
+directives ds = foldlM (\str i -> do{s <- directive i; return $ str++s}) "" ds
+    where directive d = case d of
+                            Tok t                       -> tok t >>= return
+                            ImportDecl _ _ _            -> return $ importDecl d
+                            Metadata m                  -> metadata m >>= return
+                            MethodDecl _ _ _ _ _ _      -> methodDecl d >>= return
+                            VarS _ _ _                  -> memberVarS d >>= return
+                            _                           -> return "--unexpected directive--"
 
 --program :: Package -> StateT AsState IO String
 program (Package w p n b) = do case n of
@@ -91,10 +104,12 @@ constructorBlock (Block l bs r) = do
     bi <-  foldrM (\b s -> do{ x <- blockItem b; return $ x ++ s} ) "" bs 
     let spacebreak = break (\c -> c == '\n') ( reverse $ showw l)
     let i =  reverse $ fst spacebreak
-    let nl = if (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
+    let nl = if length (snd spacebreak) > 1 && (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
     x <- getMembers
-    let init = nl++i++ intercalate (nl++i) x
-    return $ showb l ++ init ++ nl ++ i ++ bi ++ showb r
+    let init = if length x > 0
+                   then nl++i++ intercalate (nl++i) x ++ nl ++ i
+                   else ""
+    return $ showb l ++ init ++ bi ++ showb r
 
 packageBlockItem b = 
     do x <- case b of
@@ -164,19 +179,27 @@ methodDecl (MethodDecl a f ac n s b) = do
         then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
                  then do{ x <- maybe (return "") constructorBlock b; return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x }
-                 else do x <- maybe (return "") block b
-                         st <- get
+                 else do st <- get
                          let accMap = accessors st
                          if Map.member (showd n) accMap
                               then do (t, _, _) <- Map.lookup (showd n) accMap
+                                      let arg = getArg s
+                                      x <- maybe (return "" ) (accblock arg ac) b
                                       return $ attr a ++ showb f ++ accessor ac n s t ++ x 
-                              else return $ attr a ++ showb f ++ showb n ++ signature s ++ x
+                              else do x <- maybe (return "") block b
+                                      return $ attr a ++ showb f ++ showb n ++ signature s ++ x
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
           accessor ac name s@(Signature l args r ret) t = 
               case ac of
                   Just x -> showd x ++ [toUpper $ head $ showd name] ++ tail (showb name) ++ showb l ++ showArgs args ++ showd r ++ ":" 
                             ++ fst (datatypet t) ++ (case ret of { Just (c, t) -> snd (datatypet t); Nothing -> showw r})
                   Nothing -> showb name ++ signature s
+          accblock arg ac (Block l bs r) = 
+              do let ts = case ac of { Just x -> if showd x == "set" then "\treturn "++arg++";"++ init(showw l) else ""; Nothing -> ""}
+                 bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs
+                 return $ showb l ++ bi ++ ts ++ showb r
+          getArg (Signature l (a@(Arg n c t md mc):as) r ret) = showd n
+          getArg (Signature l [] r ret) = ""
 
 signatureArgs (Signature l args r ret) = showb l ++ showArgs args  ++ showb r
 
@@ -208,7 +231,7 @@ namespace ns = case ns of
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
                    Nothing -> ""
 
-datatypet d = span isAlphaNum (datatype d)
+datatypet d = span (\c -> isAlphaNum c || c =='>' || c == '<') (datatype d)
 
 datatype d = case d of
                  AsType n -> (case (showd n) of

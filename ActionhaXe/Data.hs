@@ -26,7 +26,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Tree
 
-
 -- data
 showd :: CToken -> String
 showd x = foldr (\t s -> (tokenItemS t) ++ s) "" (fst x)
@@ -199,7 +198,8 @@ data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name,
 data Package = Package CToken CToken (Maybe CToken) BlockItem -- whitespace, package, maybe name, block
     deriving (Show)
 
-data Ast = Program Package AsState
+data Ast = AS3Program Package AsState
+         | AS3Directives [BlockItem] AsState
     deriving (Show)
 
 type AsParser = Parsec TList AsState

@@ -33,7 +33,7 @@ tokenLine (s, i) = sourceLine s
 tokenCol (s, i) = sourceColumn s
 tokenItem (s, i) = i
 
-tokenItemS (s, i) = case i of
+tokenItemS (p, i) = case i of
                         TokenWhite   s -> s
                         TokenComment s -> s 
                         TokenNum s -> case s of
@@ -164,7 +164,7 @@ atoken =
      <|> try (do{ x <- quotedDString; return x})
      <|> try (do{ x <- quotedSString; return x})
      <|> try (do{ x <- whiteSpace; return x}) 
-     <|> do{ x <- anyToken; return $ TokenUnknown $ x:[]}
+     <|>      do{ x <- anyToken; return $ TokenUnknown $ x:[]}
 
 
 lexer = many1 (do { p <- getPosition; t <- atoken; return (p, t) })

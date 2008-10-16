@@ -41,9 +41,11 @@ parseTokens fname ts = do let st = initState
                           runParser program st' fname ts
 
 program :: AsParser Ast
-program = do{ x <- package; a <- getState; return $ Program x a}
+program = try(do{ x <- package; a <-getState; return $ AS3Program x a})
+       <|>    do{ x <- directives; a <- getState; return $ AS3Directives x a }
+         
 
-package = do{ w <- startWs; p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- packageBlock; return $ Package w p i b }
+package = do{ ws <- startWs; p <- kw "package"; i <- optionMaybe(ident); storePackage i;  b <- packageBlock; return $ Package ws p i b }
 
 packageBlock = do{ l <- op "{"; enterScope; x <- inPackageBlock; r <- op "}"; exitScope; return $ Block l x r }
 
@@ -51,7 +53,9 @@ inPackageBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- metadata; i <- inPackageBlock; return $ [x] ++ i})
       <|> try(do{ x <- importDecl; i <- inPackageBlock; return $ [x] ++ i})
       <|> try(do{ x <- classDecl; i <- inPackageBlock; return $ [x] ++ i})
-      <|> try(do{ x <- anytok; i <- inPackageBlock; return $ [(Tok x)] ++ i})
+      <|>    (do{ x <- anytok; i <- inPackageBlock; return $ [(Tok x)] ++ i})
+
+directives = do{ ws <- startWs; x <- many1 (choice[metadata, importDecl, methodDecl, varS, do{ x <- anytok; return $ Tok x}]); return $ (Tok ws):x}
 
 classBlock = do{ l <- op "{"; enterScope; x <- inClassBlock; r <- op "}"; exitScope; return $ Block l x r }
 
@@ -59,7 +63,7 @@ inClassBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- metadata; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- varS; i <- inClassBlock; return $ [x] ++ i})
-      <|> try(do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
+      <|>    (do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
 
 funcBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
 
@@ -68,7 +72,7 @@ inMethodBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inMethodBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inMethodBlock; return $ [b] ++ i })
       <|> try(do{ x <- statement; i <- inMethodBlock; return $ [x]++i})
-      <|> try(do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
+      <|>    (do{ x <- anytok; i <- inMethodBlock; return $ [(Tok x)] ++ i})
 
 block = do{ l <- op "{"; enterScope; x <- inBlock; r <- op "}"; exitScope; return $ Block l x r }
 
@@ -77,7 +81,7 @@ inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- expr; i <- inBlock; return $ [x] ++ i})
       <|> try(do{ b <- block; i <- inBlock; return $ [b] ++ i })
       <|> try(do{ x <- statement; i <- inBlock; return $ [x]++i})
-      <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
+      <|>    (do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
 metadata = do{ l <- op "["
              ;   try(do{ t <- mid "SWF";  
@@ -88,11 +92,12 @@ metadata = do{ l <- op "["
                        ; return $ Metadata $ MDSwf m
                        }
                     )
-             <|>     do{ t <- choice[mid "Event", mid "ArrayElementType", mid "Embed", mid "Frame"]
+             <|> try(do{ t <- choice[mid "Event", mid "ArrayElementType", mid "Embed", mid "Frame"]
                        ; x <- manyTill anytok (lookAhead(op "]"))
                        ; r <- op "]"
                        ; return $ Metadata $ MD l t x r
                        }
+                    )
              }
 
 metadataSwf = 
@@ -114,7 +119,7 @@ classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
 -- need to fix this so it returns a tuple to classDecl
 classImplements = do{ k <- kw "implements"; s <- sepByCI1 nident (op ","); return $ k:s} 
 
-methodDecl = do{ attr <- methodAttributes
+methodDecl = try(do{ attr <- methodAttributes
                ; k <- kw "function"
                ; acc <- optionMaybe( try(kw "get") <|> (kw "set"))
                ; n <- nident
@@ -123,7 +128,7 @@ methodDecl = do{ attr <- methodAttributes
                ; b <- optionMaybe funcBlock
                ; exitScope
                ; storeProperty n acc sig
-               ; return $ MethodDecl attr k acc n sig b}
+               ; return $ MethodDecl attr k acc n sig b})
 
 methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
     where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]
@@ -143,7 +148,7 @@ defval' = try( do{ x <- kw "null"; return x})
       <|> try( do{ x <- str; return x})
       <|> do{ x <- num; return x}
 
-varS = do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const"]; b <- many1 varBinding; return $ VarS ns k b }
+varS = try(do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const"]; b <- many1 varBinding; return $ VarS ns k b })
 
 varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
