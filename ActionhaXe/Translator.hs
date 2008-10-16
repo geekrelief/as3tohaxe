@@ -84,7 +84,7 @@ packageBlockItem b =
                 Tok t                       -> tok t >>= return
                 ImportDecl _ _ _            -> return $ importDecl b
                 ClassDecl _ _ _ _ _ _       -> classDecl b >>= return
-                Metadata _ _ _ _            -> metadata b >>= return
+                Metadata m                  -> metadata m >>= return
                 _                           -> return ""
        return x
 
@@ -93,7 +93,7 @@ classBlockItem b =
                 Tok t                       -> tok t >>= return
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
                 VarS _ _ _                  -> memberVarS b >>= return
-                Metadata _ _ _ _            -> metadata b >>= return
+                Metadata m                  -> metadata m >>= return
                 _                           -> return $ show b
        return x
 
@@ -104,7 +104,7 @@ blockItem b =
                 VarS _ _ _                  -> varS b >>= return
                 ForS _ _ _ _ _ _ _ _ _      -> forS b >>= return
                 Expr _                      -> expr b >>= return
-                Metadata _ _ _ _            -> metadata b >>= return
+                Metadata m                  -> metadata m >>= return
                 _                           -> return ""
        return x
 
@@ -112,7 +112,21 @@ tok t = do let x = showb t
            f <- getFlag fpackage
            return x
 
-metadata (Metadata l t x r) = do{ return $ "/*" ++ showb l ++ showb t ++ showl x++ showd r ++ "*/" ++ showw r}
+metadata m = case m of
+                 MD l t x r -> do{ return $ "/*" ++ showb l ++ showb t ++ showl x++ showd r ++ "*/" ++ showw r}
+                 MDSwf attr -> do{ o <- swfheader attr ["400", "300", "30", "FFFFFF"]
+                                 ; st <- get
+                                 ; let outclass = reverse $ drop 3 $ reverse $ filename st
+                                 ; liftIO $ writeFile ((outfile st) ++ "ml") ("-swf "++outclass++".swf\n-main "++outclass++"\n-swf-version 10\n-swf-header " ++ o)
+                                 ; return ""
+                                 }
+    where swfheader ((k, v):as) [w, h, f, b] = 
+              case showd k of 
+                  "width"            -> swfheader as [init.tail $ showd v, h, f, b]
+                  "height"           -> swfheader as [w, init.tail $ showd v, f, b]
+                  "frameRate"        -> swfheader as [w, h, init.tail $ showd v, b]
+                  "backgroundColor"  -> swfheader as [w, h, f, tail.init.tail $ showd v]
+          swfheader [] header = return $ intercalate ":" header
 
 importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybeEl showb s  -- look up and adjust
 

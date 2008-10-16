@@ -158,7 +158,11 @@ data BlockItem =  Tok        CToken
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarS       (Maybe [CToken]) CToken [VarBinding] -- maybe attributes, var, varbindings
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}
-                | Metadata CToken CToken [CToken] CToken
+                | Metadata   Metadata
+    deriving (Show)
+
+data Metadata = MDSwf [(CToken, CToken)]
+              | MD    CToken CToken [CToken] CToken
     deriving (Show)
 
 data ForInit = FIListE ListE
@@ -214,11 +218,11 @@ type AsDefTuple = (AsDef, AsDefInfo)
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show)
 
-data AsState = AsState{ curId::Int, flags::Map String String, accessors::Map String (AsType, Bool, Bool), initMembers::[String], path::[Int], scopes::Tree AsStateEl }
+data AsState = AsState{ filename::String, outfile::String, curId::Int, flags::Map String String, accessors::Map String (AsType, Bool, Bool), initMembers::[String], path::[Int], scopes::Tree AsStateEl }
     deriving (Show)
 
 initState :: AsState
-initState = AsState{ curId = 0, path = [0], flags = Map.empty, accessors = Map.empty, initMembers = [], scopes = newScope 0}
+initState = AsState{ filename = "", outfile = "", curId = 0, path = [0], flags = Map.empty, accessors = Map.empty, initMembers = [], scopes = newScope 0}
 
 getProperty name = 
     do x <- getState

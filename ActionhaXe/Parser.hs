@@ -19,7 +19,9 @@ import Text.Parsec.Expr
 emptyctok = ([],[])
 
 parseTokens :: String -> [Token] -> Either ParseError Ast
-parseTokens filename ts = runParser program initState filename ts
+parseTokens fname ts = do let st = initState
+                          let st' = st{filename = fname}
+                          runParser program st' fname ts
 
 program :: AsParser Ast
 program = do{ x <- package; a <- getState; return $ Program x a}
@@ -60,11 +62,27 @@ inBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- statement; i <- inBlock; return $ [x]++i})
       <|> try(do{ x <- anytok; i <- inBlock; return $ [(Tok x)] ++ i})
 
-metadata = do l <- op "["
-              t <- choice[mid "Event", mid "ArrayElementType", mid "SWF", mid "Embed", mid "Frame"]
-              x <- manyTill anytok (lookAhead(op "]"))
-              r <- op "]"
-              return $ Metadata l t x r
+metadata = do{ l <- op "["
+             ;   try(do{ t <- mid "SWF";  
+                       ; lp <- op "("
+                       ; m <- metadataSwf
+                       ; rp <- op ")"
+                       ; r <- op "]"
+                       ; return $ Metadata $ MDSwf m
+                       }
+                    )
+             <|>     do{ t <- choice[mid "Event", mid "ArrayElementType", mid "Embed", mid "Frame"]
+                       ; x <- manyTill anytok (lookAhead(op "]"))
+                       ; r <- op "]"
+                       ; return $ Metadata $ MD l t x r
+                       }
+             }
+
+metadataSwf = 
+    permute $ mlist <$?> (missing, item "width") <|?> (missing, item "height") <|?> (missing, item "backgroundColor") <|?> (missing, item "frameRate")
+        where mlist w h b f = filter (\a -> (fst a) /= emptyctok) [w, h, b, f]
+              item i = do{ x <- mid i; op "="; s <- str; optionMaybe (op ","); return (x, s)}
+              missing = (emptyctok, emptyctok)
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 

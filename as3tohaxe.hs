@@ -19,11 +19,11 @@ translateFile filename = do
     putStrLn $ "Translating " ++ filename
     contents <- readFile filename
     let tokens = runLexer "" contents
+    let outfilename = outdir ++ (reverse $ "xh" ++ ( drop 2 $ reverse filename))
     program <- case parseTokens filename tokens of
-        Right (Program ast st) -> return (ast, st)
+        Right (Program ast st) -> return (ast, st{outfile = outfilename })
         Left err  -> fail $ show err
     trans <- runStateT (translateAs3Ast (fst program)) (snd program)
-    let outfilename = outdir ++ (reverse $ "xh" ++ ( drop 2 $ reverse filename))
     writeFile outfilename $ fst trans
 
 isFile f = do t <- doesFileExist f
