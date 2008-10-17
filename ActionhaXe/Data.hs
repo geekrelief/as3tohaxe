@@ -192,7 +192,7 @@ data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- lef
     deriving (Show)
 
 data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
-         | RestArg [CToken] CToken -- ..., name
+         | RestArg CToken CToken -- ..., name
     deriving (Show)
 
 data Package = Package CToken CToken (Maybe CToken) BlockItem -- whitespace, package, maybe name, block

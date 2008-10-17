@@ -211,6 +211,7 @@ signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ ret
 
 showArgs as = concat $ map showArg as
     where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
+          showArg (RestArg o n) = showd n ++ ":Array<Dynamic>"
 
 memberVarS (VarS ns v b) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns

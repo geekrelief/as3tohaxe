@@ -136,8 +136,8 @@ methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (k
 signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( do{ o <- op ":"; r <- datatype; return (o, r)}); return $ Signature lp a rp ret} -- missing return type means constructor
 
 sigargs = do{ s <- many sigarg; return s}
-sigarg = try(do{ a <- ident; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o' <- op "="; a <- defval; return $ [o']++a}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
-     <|> do{ d <- count 3 (op "."); i <- ident; storeVar i AsTypeRest; return $ RestArg d i }
+sigarg = try(do{ a <- idn; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o' <- op "="; a <- defval; return $ [o']++a}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
+     <|>     do{ d <- op "..."; i <- idn; storeVar i AsTypeRest; return $ RestArg d i }
 
 defval = do{ x <- manyTill defval' (try (lookAhead (op ",")) <|> lookAhead(op ")")); return x }
 
