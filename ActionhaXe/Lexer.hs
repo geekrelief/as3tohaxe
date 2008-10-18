@@ -44,7 +44,8 @@ tokenItemS (p, i) = case i of
                         TokenIdent   s -> s
                         TokenString  s -> s
                         TokenNl      s -> s
-                        TokenRegex   (s,s') -> s++s'
+--                        TokenRegex   (s,s') -> s++s'
+                        TokenEscaped s -> s
                         TokenXml     s -> s
                         TokenKw      s -> s
                         TokenOp      s -> s
@@ -63,7 +64,8 @@ data TokenType =
            | TokenIdent String
            | TokenString String
            | TokenNl String
-           | TokenRegex (String, String)
+--           | TokenRegex (String, String)
+           | TokenEscaped String
            | TokenKw String
            | TokenOp String
            | TokenXml String
@@ -112,6 +114,8 @@ anyCharButNl = do{ c <- (satisfy(\c-> isPrint c && c /= '\r' && c /= '\n')); ret
 escapedAnyChar = try(do{ char '\\'; c <- anyCharButNl; return $ "\\"++[c]})
              <|> do{ c <- anyCharButNl; return [c]}
 
+escapedCharToken = do{ char '\\'; c <- anyCharButNl; return $ TokenEscaped $ "\\"++[c]}
+
 nl' = do{ try (string "\r\n"); return "\r\n" }
  <|> do{ try (char '\n'); return "\n" }
  <|> do{ try (char '\r'); return "\r" }
@@ -128,9 +132,11 @@ xml = do{ char '<'; t <- many1 (satisfy (\c -> isPrint c && c /= '>')); char '>'
 
 xmlSTag = do{ char '<'; t <- manyTill (satisfy (\c -> isPrint c && c /= '/' && c /= '>')) (string "/>"); return $ TokenXml $ "<"++t++"/>"}
 
+{-
 regexOptions = permute (catter <$?> ('_', char 'g') <|?> ('_', char 'i') <|?> ('_', char 'm') <|?> ('_', char 's') <|?> ('_', char 'x'))
     where catter g i m s x =  filter (\c -> c /= '_') [g, i, m, s, x]
 regex = do { char '/'; notFollowedBy (char ' '); s <- manyTill escapedAnyChar (char '/'); o <- optionMaybe regexOptions; return $ maybe (TokenRegex ("/"++(concat s)++"/", "")) (\m -> TokenRegex ("/"++(concat s)++"/", m)) o}
+-}
 
 number = try (do{ char '0'; char 'x'; x <- many1 hexDigit; return $ TokenNum $ TokenHex $ "0x"++x})
      <|> try (do{ char '0'; x <- many1 octDigit; return $ TokenNum $ TokenOctal $ "0"++x})
@@ -157,7 +163,8 @@ atoken =
      <|> try (do{ x <- commentMLine; return x})
      <|> try (do{ x <- xmlSTag; return x})
      <|> try (do{ x <- xml; return x})
-     <|> try (do{ x <- regex; return x})
+--     <|> try (do{ x <- regex; return x})
+     <|> try (do{ x <- escapedCharToken; return x})
      <|> try (do{ x <- number; return x})
      <|> try (do{ x <- operator; return x})
      <|> try (do{ x <- identifier; return x})

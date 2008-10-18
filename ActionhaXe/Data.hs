@@ -68,7 +68,7 @@ data PrimaryE = PEThis CToken                     -- this
               | PELit CToken                      -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
               | PEArray ArrayLit                  -- array literal
               | PEObject ObjectLit                -- {, maybe [[property : assignE],[,]] , }
-              | PERegex  CToken
+--              | PERegex  CToken
               | PEXml CToken
               | PEFunc FuncE
               | PEParens CToken ListE CToken  -- (, List of expressions , )
@@ -154,7 +154,11 @@ data AritE = AEUnary UnaryE
            | AEBinary CToken AritE AritE
     deriving (Show)
 
+data RegE = RegE CToken [CToken] CToken (Maybe CToken)
+    deriving (Show)
+
 data CondE = CondE AritE (Maybe (CToken, AssignE, CToken, AssignE))
+           | CondRE RegE
     deriving (Show)
 
 data NAssignE = NAssignE AritE (Maybe (CToken, NAssignE, CToken, NAssignE))
@@ -192,7 +196,7 @@ data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- lef
     deriving (Show)
 
 data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
-         | RestArg CToken CToken -- ..., name
+         | RestArg CToken CToken (Maybe (CToken, AsType)) -- ..., name
     deriving (Show)
 
 data Package = Package CToken CToken (Maybe CToken) BlockItem -- whitespace, package, maybe name, block

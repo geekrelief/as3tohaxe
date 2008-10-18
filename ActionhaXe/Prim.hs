@@ -65,9 +65,11 @@ str' = mytoken $ \t -> case tokenItem t of
                          TokenString x -> Just [t]
                          _ -> Nothing
 
+{-
 reg' = mytoken $ \t -> case tokenItem t of
                           TokenRegex x -> Just [t]
                           _ -> Nothing
+-}
 
 kw' k = mytoken $ \t -> case tokenItem t of
                            TokenKw k'| k == k' -> Just [t]
@@ -84,7 +86,7 @@ xml' = mytoken $ \t -> case tokenItem t of
 idn = mylexeme $ id'
 num = mylexeme $ num'
 str = mylexeme $ str'
-reg = mylexeme $ reg'
+--reg = mylexeme $ reg'
 xml = mylexeme $ xml'
 
 mid i = mylexeme $ mid' i

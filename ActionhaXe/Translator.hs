@@ -211,7 +211,7 @@ signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ ret
 
 showArgs as = concat $ map showArg as
     where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
-          showArg (RestArg o n) = showd n ++ ":Array<Dynamic>"
+          showArg (RestArg o n t) = showd n ++ ":Array<Dynamic>"
 
 memberVarS (VarS ns v b) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
@@ -258,7 +258,7 @@ primaryE x = case x of
                  PELit x -> do{ return $ showb x}
                  PEArray x -> do{ r <- arrayLit x; return r}
                  PEObject x -> do{ r <- objectLit x; return r}
-                 PERegex x -> do{ return $ "~" ++ showb x}
+--                 PERegex x -> do{ return $ "~" ++ showb x}
                  PEXml x -> do{ return $ "Xml.parse(\""++ showd x ++ "\")" ++ showw x}
                  PEFunc x -> do{ r <- funcE x; return r}
                  PEParens l x r -> do{ v <- listE x; return $ showb l ++ v ++ showd r ++ showw r}
@@ -347,6 +347,10 @@ binaryE (AEBinary o x y)
 	| showd o == "as" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "cast( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
     | otherwise       = do{ x' <- aritE x; y' <- aritE y; return $ x' ++ showb o ++ y'}
 
+
+regE (RegE l x r o) = do{ return $ "~"++ showb l ++ showl x ++ showb r ++ maybeEl showb o}
+
+condE (CondRE r) = do{ e <- regE r; return $ e}
 condE (CondE e o) = do{ e' <- aritE e; o' <- maybe (return "") (\(q, e1, c, e2) -> do{ e1' <- assignE e1; e2' <- assignE e2; return $ showb q ++ e1' ++ showb c ++ e2'}) o; return $ e' ++ o'}
 
 condENoIn = condE

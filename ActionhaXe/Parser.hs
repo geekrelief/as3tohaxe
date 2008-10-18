@@ -92,7 +92,16 @@ metadata = do{ l <- op "["
                        ; return $ Metadata $ MDSwf m
                        }
                     )
-             <|> try(do{ t <- choice[mid "Event", mid "ArrayElementType", mid "Embed", mid "Frame"]
+             <|> try(do{ t <- choice[mid "ArrayElementType"
+                                    , mid "Bindable"
+                                    , mid "DefaultProperty" , mid "Deprecated"
+                                    , mid "Effect" , mid "Embed" , mid "Event" , mid "Exclude" , mid "ExcludeClass"
+                                    , mid "IconFile" , mid "Inspectable" , mid "InstanceType"
+                                    , mid "NonCommittingChangeEvent"
+                                    , mid "RemoteClass"
+                                    , mid "Style"
+                                    , mid "Transient"
+                                    ]
                        ; x <- manyTill anytok (lookAhead(op "]"))
                        ; r <- op "]"
                        ; return $ Metadata $ MD l t x r
@@ -137,7 +146,7 @@ signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( d
 
 sigargs = do{ s <- many sigarg; return s}
 sigarg = try(do{ a <- idn; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o' <- op "="; a <- defval; return $ [o']++a}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
-     <|>     do{ d <- op "..."; i <- idn; storeVar i AsTypeRest; return $ RestArg d i }
+     <|>     do{ d <- op "..."; i <- idn; t <- optionMaybe (do{ o <- op ":"; t <- datatype; return (o, t)}); storeVar i AsTypeRest; return $ RestArg d i t }
 
 defval = do{ x <- manyTill defval' (try (lookAhead (op ",")) <|> lookAhead(op ")")); return x }
 
@@ -177,7 +186,7 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- num; return $ PELit x})
        <|> try(do{ x <- arrayLit; return $ PEArray x})
        <|> try(do{ x <- objectLit; return $ PEObject x})
-       <|> try(do{ x <- reg; return $ PERegex x})
+--       <|> try(do{ x <- reg; return $ PERegex x})
        <|> try(do{ x <- xml; return $ PEXml x})
        <|> try(do{ x <- funcE; return $ PEFunc x})
        <|> do{ x <- parenE; return $ x} 
@@ -273,9 +282,13 @@ aritOpTable allowIn =
     where o opr = Infix (do{ o' <- op opr; return (\x y -> AEBinary o' x y)}) AssocLeft
           ok kop = Infix (do{ k <- kw kop; return (\x y -> AEBinary k x y)}) AssocLeft
 
-condE = do{ e <- aritE; o <- optionMaybe (do{ q <- op "?"; e1 <- assignE; c <- op ":"; e2 <- assignE; return $ (q, e1, c, e2)}); return $ CondE e o}
+regE = do{ l <- op "/"; x <- manyTill anytok (try(lookAhead(op "/"))); r <- op "/"; o <- optionMaybe idn; return $ RegE l x r o}
 
-condENoIn = do{ e <- aritENoIn; o <- optionMaybe (do{ q <- op "?"; e1 <- assignENoIn; c <- op ":"; e2 <- assignENoIn; return $ (q, e1, c, e2)}); return $ CondE e o}
+condE = try(do{ r <- regE; return $ CondRE r})
+    <|> do{ e <- aritE; o <- optionMaybe (do{ q <- op "?"; e1 <- assignE; c <- op ":"; e2 <- assignE; return $ (q, e1, c, e2)}); return $ CondE e o}
+
+condENoIn = try(do{ r <- regE; return $ CondRE r})
+        <|> do{ e <- aritENoIn; o <- optionMaybe (do{ q <- op "?"; e1 <- assignENoIn; c <- op ":"; e2 <- assignENoIn; return $ (q, e1, c, e2)}); return $ CondE e o}
 
 nonAssignE = do{ e <- aritE; o <- optionMaybe (do{ q <- op "?"; e1 <- nonAssignE; c <- op ":"; e2 <- nonAssignE; return $ (q, e1, c, e2)}); return $ NAssignE e o}
 
