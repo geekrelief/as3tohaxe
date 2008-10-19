@@ -96,6 +96,11 @@ classBlock (Block l bs r)  = do
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
     return $ showd l ++ props ++ showw l ++ bi ++ showb r
 
+interfaceBlock (Block l bs r)  = do 
+    bi <-  foldlM (\s b -> do{ x <- interfaceBlockItem b; return $ s ++ x} ) "" bs 
+    return $ showb l ++ bi ++ showb r
+
+
 block (Block l bs r)  = do 
     bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
     return $ showb l ++ bi ++ showb r
@@ -116,6 +121,7 @@ packageBlockItem b =
                 Tok t                       -> tok t >>= return
                 ImportDecl _ _ _            -> return $ importDecl b
                 ClassDecl _ _ _ _ _ _       -> classDecl b >>= return
+                Interface _ _ _ _ _         -> interface b >>= return
                 Metadata m                  -> metadata m >>= return
                 _                           -> return ""
        return x
@@ -125,6 +131,14 @@ classBlockItem b =
                 Tok t                       -> tok t >>= return
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
                 VarS _ _ _                  -> memberVarS b >>= return
+                Metadata m                  -> metadata m >>= return
+                _                           -> return $ show b
+       return x
+
+interfaceBlockItem b = 
+    do x <- case b of
+                Tok t                       -> tok t >>= return
+                MethodDecl _ _ _ _ _ _      -> imethodDecl b >>= return
                 Metadata m                  -> metadata m >>= return
                 _                           -> return $ show b
        return x
@@ -171,6 +185,11 @@ classDecl (ClassDecl a c n e i b) = do
           attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
           implements is = maybeEl showl is
 
+interface (Interface a i n e b) = do
+    x <- interfaceBlock b
+    return $ attr a ++ showb i ++ showb n ++ maybeEl showl e ++ x
+    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
+
 methodDecl (MethodDecl a f ac n s b) = do 
     packageName <- getFlag fpackage
     className <- getFlag fclass
@@ -200,6 +219,12 @@ methodDecl (MethodDecl a f ac n s b) = do
                  return $ showb l ++ bi ++ ts ++ showb r
           getArg (Signature l (a@(Arg n c t md mc):as) r ret) = showd n
           getArg (Signature l [] r ret) = ""
+
+
+imethodDecl (MethodDecl a f ac n s b) = do 
+    return $ attr a ++ showb f ++ showb n ++ signature s
+    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; x -> showb attr }) as
+
 
 signatureArgs (Signature l args r ret) = showb l ++ showArgs args  ++ showb r
 

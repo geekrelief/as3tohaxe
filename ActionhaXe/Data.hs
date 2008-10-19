@@ -68,7 +68,6 @@ data PrimaryE = PEThis CToken                     -- this
               | PELit CToken                      -- literal: null, boolean, numeric, string, not regular expression or xml since those don't have operations on them outside of class methods
               | PEArray ArrayLit                  -- array literal
               | PEObject ObjectLit                -- {, maybe [[property : assignE],[,]] , }
---              | PERegex  CToken
               | PEXml CToken
               | PEFunc FuncE
               | PEParens CToken ListE CToken  -- (, List of expressions , )
@@ -175,6 +174,7 @@ data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
+                | Interface  [CToken] CToken CToken (Maybe [CToken]) BlockItem -- public | internal, interface, identifier, maybe extends, body
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarS       (Maybe [CToken]) CToken [VarBinding] -- maybe attributes, var, varbindings
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}

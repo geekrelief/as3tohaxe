@@ -53,6 +53,7 @@ inPackageBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- metadata; i <- inPackageBlock; return $ [x] ++ i})
       <|> try(do{ x <- importDecl; i <- inPackageBlock; return $ [x] ++ i})
       <|> try(do{ x <- classDecl; i <- inPackageBlock; return $ [x] ++ i})
+      <|> try(do{ x <- interface; i <- inPackageBlock; return $ [x] ++ i})
       <|>    (do{ x <- anytok; i <- inPackageBlock; return $ [(Tok x)] ++ i})
 
 directives = do{ ws <- startWs; x <- many1 (choice[metadata, importDecl, methodDecl, varS, do{ x <- anytok; return $ Tok x}]); return $ (Tok ws):x}
@@ -64,6 +65,13 @@ inClassBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- varS; i <- inClassBlock; return $ [x] ++ i})
       <|>    (do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
+
+interfaceBlock = do{ l <- op "{"; enterScope; x <- inInterfaceBlock; r <- op "}"; exitScope; return $ Block l x r }
+
+inInterfaceBlock = try(do{ lookAhead( op "}"); return [] })
+      <|> try(do{ x <- metadata; i <- inInterfaceBlock; return $ [x] ++ i})
+      <|> try(do{ x <- methodDecl; i <- inInterfaceBlock; return $ [x] ++ i})
+      <|>    (do{ x <- anytok; i <- inInterfaceBlock; return $ [(Tok x)] ++ i})
 
 funcBlock = do{ l <- op "{"; enterScope; x <- inMethodBlock; r <- op "}"; exitScope; return $ Block l x r }
 
@@ -117,6 +125,8 @@ metadataSwf =
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 
+interface = do{ a <- classAttributes; k <- kw "interface"; i <- ident; e <- optionMaybe(classExtends); b <- classBlock; return $ Interface a k i e b}
+
 -- need to fix classImplements to return a tuple
 classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); storeClass i; b <- classBlock; return $ ClassDecl a k i e im b}
 
@@ -139,8 +149,8 @@ methodDecl = try(do{ attr <- methodAttributes
                ; storeProperty n acc sig
                ; return $ MethodDecl attr k acc n sig b})
 
-methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
-    where list v o s f n ns = filter (\a -> fst a /= []) [v,ns,o,s,f,n]
+methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "internal") <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
+    where list v ns i o s f n = filter (\a -> fst a /= []) [v,ns,i,o,s,f,n]
 
 signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( do{ o <- op ":"; r <- datatype; return (o, r)}); return $ Signature lp a rp ret} -- missing return type means constructor
 
