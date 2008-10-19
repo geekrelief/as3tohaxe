@@ -195,7 +195,7 @@ data VarBinding = VarBinding CToken CToken AsType (Maybe (CToken, AssignE)) (May
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
     deriving (Show)
 
-data Arg = Arg CToken CToken AsType (Maybe [CToken]) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
+data Arg = Arg CToken CToken AsType (Maybe (CToken, AssignE)) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
          | RestArg CToken CToken (Maybe (CToken, AsType)) -- ..., name
     deriving (Show)
 

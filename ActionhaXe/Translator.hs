@@ -197,22 +197,26 @@ methodDecl (MethodDecl a f ac n s b) = do
     if packageName == mainPackage && className == (showd n) && classAttr == "public"
         then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
-                 then do{ x <- maybe (return "") constructorBlock b; return $ attr a ++ showb f ++ "new"++showw n ++ signatureArgs s ++ x }
+                 then do{ x <- maybe (return "") constructorBlock b; s' <- signatureArgs s; return $ attr a ++ showb f ++ "new"++showw n ++ s' ++ x }
                  else do st <- get
                          let accMap = accessors st
                          if Map.member (showd n) accMap
                               then do (t, _, _) <- Map.lookup (showd n) accMap
                                       let arg = getArg s
                                       x <- maybe (return "" ) (accblock arg ac) b
-                                      return $ attr a ++ showb f ++ accessor ac n s t ++ x 
+                                      acc' <- accessor ac n s t
+                                      return $ attr a ++ showb f ++ acc' ++ x 
                               else do x <- maybe (return "") block b
-                                      return $ attr a ++ showb f ++ showb n ++ signature s ++ x
+                                      s' <- signature s
+                                      return $ attr a ++ showb f ++ showb n ++ s' ++ x
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
           accessor ac name s@(Signature l args r ret) t = 
               case ac of
-                  Just x -> showd x ++ [toUpper $ head $ showd name] ++ tail (showb name) ++ showb l ++ showArgs args ++ showd r ++ ":" 
-                            ++ fst (datatypet t) ++ (case ret of { Just (c, t) -> snd (datatypet t); Nothing -> showw r})
-                  Nothing -> showb name ++ signature s
+                  Just x -> do{ a <- showArgs args
+                              ; return $ showd x ++ [toUpper $ head $ showd name] ++ tail (showb name) ++ showb l ++ a ++ showd r ++ ":" 
+                                ++ fst (datatypet t) ++ (case ret of { Just (c, t) -> snd (datatypet t); Nothing -> showw r})
+                              }
+                  Nothing -> do{ s' <- signature s; return $ showb name ++ s'}
           accblock arg ac (Block l bs r) = 
               do let ts = case ac of { Just x -> if showd x == "set" then "\treturn "++arg++";"++ init(showw l) else ""; Nothing -> ""}
                  bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs
@@ -222,21 +226,28 @@ methodDecl (MethodDecl a f ac n s b) = do
 
 
 imethodDecl (MethodDecl a f ac n s b) = do 
-    return $ attr a ++ showb f ++ showb n ++ signature s
+    s' <- signature s
+    return $ attr a ++ showb f ++ showb n ++ s'
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; x -> showb attr }) as
 
 
-signatureArgs (Signature l args r ret) = showb l ++ showArgs args  ++ showb r
+signatureArgs (Signature l args r ret) = do{ a <- showArgs args
+                                           ; return $ showb l ++ a ++ showb r
+                                           }
 
 rettype ret = case ret of
                   Just (c, t) -> showb c ++ datatype t
                   Nothing     -> ""
 
-signature (Signature l args r ret) = showb l ++ showArgs args  ++ showb r ++ rettype ret
+signature (Signature l args r ret) = do{ a <- showArgs args
+                                       ; return $ showb l ++ a ++ showb r ++ rettype ret
+                                       }
 
-showArgs as = concat $ map showArg as
-    where showArg (Arg n c t md mc) = (case md of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ maybeEl showl md ++ maybeEl showb mc
-          showArg (RestArg o n t) = showd n ++ ":Array<Dynamic>"
+showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
+    where showArg (Arg n c t i mc) = do{ i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i
+                                       ; return $ (case i of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ i' ++ maybeEl showb mc
+                                       }
+          showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
 memberVarS (VarS ns v b) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
@@ -302,7 +313,7 @@ propertyNameAndValueList (PropertyList x) = do
     p <- foldrM (\(p, c, e, s) str -> do{ ex <- assignE e; return $ showb p ++ showb c ++ ex ++ maybe "" showb s ++ str}) "" x
     return p
 
-funcE (FuncE f i s b) = do{ x <- block b; return $ showb f ++ signature s ++ x}
+funcE (FuncE f i s b) = do{ x <- block b; s' <- signature s; return $ showb f ++ s' ++ x}
 
 listE (ListE l) = do{ x <- foldrM (\(e, c) s -> do{es <- assignE e; return $ es ++ maybe "" showb c ++ s} ) "" l; return x}
 
