@@ -17,7 +17,7 @@
 -}
 -- Turn the as3 source into Tokens for parsing
 
-module ActionhaXe.Lexer (runLexer, Token, tokenSource, tokenLine, tokenCol, tokenItem, tokenItemS, TokenType(..), TokenNum(..), keywords, operators) where
+module ActionhaXe.Lexer (runLexer, Token, tokenSource, tokenLine, tokenCol, tokenItem, tokenItemS, TPos(..), TokenType(..), TokenNum(..), keywords, operators) where
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
@@ -25,12 +25,16 @@ import Text.Parsec.Char
 import Text.Parsec.Perm
 import Data.Char
 import Data.List 
+import Data.Generics -- not Haskell '98
 
-type Token = (SourcePos, TokenType)
+type Token = (TPos, TokenType)
 
-tokenSource (s, i) = sourceName s
-tokenLine (s, i) = sourceLine s
-tokenCol (s, i) = sourceColumn s
+data TPos = TPos SourceName Line Column
+    deriving (Show, Eq, Ord, Data, Typeable)
+
+tokenSource ((TPos s l c), i) = s
+tokenLine ((TPos s l c), i) = l
+tokenCol ((TPos s l c), i) = c
 tokenItem (s, i) = i
 
 tokenItemS (p, i) = case i of
@@ -44,7 +48,6 @@ tokenItemS (p, i) = case i of
                         TokenIdent   s -> s
                         TokenString  s -> s
                         TokenNl      s -> s
---                        TokenRegex   (s,s') -> s++s'
                         TokenEscaped s -> s
                         TokenXml     s -> s
                         TokenKw      s -> s
@@ -55,7 +58,7 @@ data TokenNum    = TokenInteger String
                  | TokenDouble String
                  | TokenOctal String
                  | TokenHex String
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Data, Typeable)
 
 data TokenType = 
              TokenWhite String
@@ -64,13 +67,12 @@ data TokenType =
            | TokenIdent String
            | TokenString String
            | TokenNl String
---           | TokenRegex (String, String)
            | TokenEscaped String
            | TokenKw String
            | TokenOp String
            | TokenXml String
            | TokenUnknown String
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Data, Typeable)
 
 keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue", "default",
              "delete", "do", "else", "extends", "false", "finally", "for", "function", "if",
@@ -133,12 +135,6 @@ xml = do{ char '<'; t <- many1 (satisfy (\c -> isPrint c && c /= '>')); char '>'
 
 xmlSTag = do{ char '<'; t <- manyTill (satisfy (\c -> isPrint c && c /= '/' && c /= '>')) (string "/>"); return $ TokenXml $ "<"++t++"/>"}
 
-{-
-regexOptions = permute (catter <$?> ('_', char 'g') <|?> ('_', char 'i') <|?> ('_', char 'm') <|?> ('_', char 's') <|?> ('_', char 'x'))
-    where catter g i m s x =  filter (\c -> c /= '_') [g, i, m, s, x]
-regex = do { char '/'; notFollowedBy (char ' '); s <- manyTill escapedAnyChar (char '/'); o <- optionMaybe regexOptions; return $ maybe (TokenRegex ("/"++(concat s)++"/", "")) (\m -> TokenRegex ("/"++(concat s)++"/", m)) o}
--}
-
 number = try (do{ char '0'; char 'x'; x <- many1 hexDigit; return $ TokenNum $ TokenHex $ "0x"++x})
      <|> try (do{ char '0'; x <- many1 octDigit; return $ TokenNum $ TokenOctal $ "0"++x})
      <|> try (do{ x <- double; return $ TokenNum $ TokenDouble $  x })
@@ -164,7 +160,6 @@ atoken =
      <|> try (do{ x <- commentMLine; return x})
      <|> try (do{ x <- xmlSTag; return x})
      <|> try (do{ x <- xml; return x})
---     <|> try (do{ x <- regex; return x})
      <|> try (do{ x <- escapedCharToken; return x})
      <|> try (do{ x <- number; return x})
      <|> try (do{ x <- operator; return x})
@@ -175,7 +170,7 @@ atoken =
      <|>      do{ x <- anyToken; return $ TokenUnknown $ x:[]}
 
 
-lexer = many1 (do { p <- getPosition; t <- atoken; return (p, t) })
+lexer = many1 (do { p <- getPosition; t <- atoken; return (TPos (sourceName p) (sourceLine p) (sourceColumn p), t) })
 
 runLexer :: String -> String -> [Token]
 runLexer filename s = case parse lexer filename s of

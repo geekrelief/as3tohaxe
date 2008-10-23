@@ -29,6 +29,7 @@ import Control.Monad.State
 import Data.Foldable (foldlM, foldrM)
 import Data.List (intercalate)
 import Data.Char (toUpper, isAlphaNum)
+import Data.Generics -- not Haskell 98
 
 -- flags
 mainPackage = "mainPackage"
@@ -245,7 +246,8 @@ signature (Signature l args r ret) = do{ a <- showArgs args
 
 showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
     where showArg (Arg n c t i mc) = do{ i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i
-                                       ; return $ (case i of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ datatype t ++ i' ++ maybeEl showb mc
+                                       ; t' <- datatypeiM t i
+                                       ; return $ (case i of{ Just d  -> "?"; Nothing -> ""}) ++ showb n ++ showb c ++ t' ++ i' ++ maybeEl showb mc
                                        }
           showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
@@ -260,8 +262,12 @@ varBinding :: VarBinding -> Bool -> StateT AsState IO String
 varBinding (VarBinding n c d i s) initMember = 
     do{ i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
       ; if i' /= "" && initMember
-            then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"; return $ showl [n,c] ++ datatype d ++ maybeEl showb s}
-            else return $ showl [n,c] ++ datatype d ++ i' ++ maybeEl showb s
+            then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"
+                   ; d' <- datatypeiM d i
+                   ; return $ showl [n,c] ++ d' ++ maybeEl showb s}
+            else do{ d' <- datatypeiM d i
+                   ; return $ showl [n,c] ++ d' ++ i' ++ maybeEl showb s
+                   }
       }
 
 namespace ns = case ns of 
@@ -270,23 +276,60 @@ namespace ns = case ns of
 
 datatypet d = span (\c -> isAlphaNum c || c =='>' || c == '<') (datatype d)
 
-datatype d = case d of
-                 AsType n -> (case (showd n) of
-                                  "void"    -> "Void"
-                                  "Boolean" -> "Bool"
-                                  "uint"    -> "UInt"
-                                  "int"     -> "Int"
-                                  "Number"  -> "Float"
-                                  "String"  -> "String"
-                                  "*"       -> "Dynamic"
-                                  "Object"  -> "Dynamic"
-                                  "Function"-> "Dynamic"
-                                  "Array"   -> "Array<Dynamic>"
-                                  "XML"     -> "Xml"
-                                  "RegExp"  -> "EReg"
-                             ) ++ showw n
-                 AsTypeRest -> "Array<Dynamic>"
-                 AsTypeUser n -> showb n
+datatype d = 
+    case d of
+        AsType n -> (case (showd n) of
+                         "void"    -> "Void"
+                         "Boolean" -> "Bool"
+                         "uint"    -> "UInt"
+                         "int"     -> "Int"
+                         "Number"  -> "Number"
+                         "String"  -> "String"
+                         "*"       -> "Dynamic"
+                         "Object"  -> "Dynamic"
+                         "Function"-> "Dynamic"
+                         "Array"   -> "Array<Dynamic>"
+                         "XML"     -> "XML"
+                         "RegExp"  -> "EReg"
+                      ) ++ showw n
+        AsTypeRest -> "Array<Dynamic>"
+        AsTypeUser n -> showb n
+
+datatypeiM d Nothing = return $ datatype d
+datatypeiM d i = 
+    case d of
+        AsType n -> do{ r <- case (showd n) of
+                            "void"    -> return "Void"
+                            "Boolean" -> return "Bool"
+                            "uint"    -> return "UInt"
+                            "int"     -> return "Int"
+                            "Number"  -> do{ case i of
+                                                 Just (o, e) -> do{ case (hasFloat e) of
+                                                                        True  -> return "Float"
+                                                                        False -> return "Int"
+                                                                  } 
+                                                 Nothing -> return "Float"
+                                           }
+                            "String"  -> return "String"
+                            "*"       -> return "Dynamic"
+                            "Object"  -> return "Dynamic"
+                            "Function"-> return "Dynamic"
+                            "Array"   -> return "Array<Dynamic>"
+                            "XML"     -> return "XML"
+                            "RegExp"  -> return "EReg"
+                      ; return $ r ++ showw n
+                      }
+        AsTypeRest -> return $ "Array<Dynamic>"
+        AsTypeUser n -> return $ showb n
+{-        AsTypeNone -> case i of
+                          Just (o, e) ->
+                          Nothing -> "Dynamic"
+-}
+
+hasFloat = everything (||) (False `mkQ` isFloat)
+
+isFloat (TokenDouble x) = True
+isFloat _ = False
 
 primaryE x = case x of
                  PEThis x -> do{ return $ showb x}
@@ -294,7 +337,6 @@ primaryE x = case x of
                  PELit x -> do{ return $ showb x}
                  PEArray x -> do{ r <- arrayLit x; return r}
                  PEObject x -> do{ r <- objectLit x; return r}
---                 PERegex x -> do{ return $ "~" ++ showb x}
                  PEXml x -> do{ return $ "Xml.parse(\""++ showd x ++ "\")" ++ showw x}
                  PEFunc x -> do{ r <- funcE x; return r}
                  PEParens l x r -> do{ v <- listE x; return $ showb l ++ v ++ showd r ++ showw r}
@@ -381,6 +423,7 @@ aritENoIn = aritE
 
 binaryE (AEBinary o x y)  
 	| showd o == "as" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "cast( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
+	| showd o == "is" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "Std.is( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
     | otherwise       = do{ x' <- aritE x; y' <- aritE y; return $ x' ++ showb o ++ y'}
 
 

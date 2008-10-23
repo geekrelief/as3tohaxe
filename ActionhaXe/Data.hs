@@ -25,6 +25,7 @@ import Data.Char
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Tree
+import Data.Generics -- not Haskel 98
 
 -- data
 showd :: CToken -> String
@@ -71,71 +72,71 @@ data PrimaryE = PEThis CToken                     -- this
               | PEXml CToken
               | PEFunc FuncE
               | PEParens CToken ListE CToken  -- (, List of expressions , )
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data ListE = ListE [(AssignE, (Maybe CToken))] 
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data ArrayLit = ArrayLitC CToken (Maybe Elision) CToken  -- [, maybe commas, ]
               | ArrayLit  CToken ElementList CToken      -- [, element list, ]
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data ElementList = El (Maybe Elision) AssignE [EAE] (Maybe Elision)
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data EAE = EAE Elision AssignE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data Elision = Elision [CToken]  -- commas possible separated by space in a list
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
-data ObjectLit = ObjectLit CToken (Maybe PropertyList) CToken deriving (Show)
+data ObjectLit = ObjectLit CToken (Maybe PropertyList) CToken deriving (Show, Data, Typeable)
 
-data PropertyList = PropertyList [(CToken, CToken, AssignE, (Maybe CToken))]  deriving (Show) -- [propertyName, :, assignE, maybe ',']
+data PropertyList = PropertyList [(CToken, CToken, AssignE, (Maybe CToken))]  deriving (Show, Data, Typeable) -- [propertyName, :, assignE, maybe ',']
 
-data FuncE = FuncE CToken (Maybe CToken) Signature BlockItem deriving (Show) -- function, maybe ident, signature, block
+data FuncE = FuncE CToken (Maybe CToken) Signature BlockItem deriving (Show, Data, Typeable) -- function, maybe ident, signature, block
 
 data Arguments = Arguments CToken (Maybe ListE) CToken
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data SuperE = SuperE CToken (Maybe Arguments)
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data PostFixE = PFFull FullPostFixE (Maybe CToken)
               | PFShortNew ShortNewE (Maybe CToken)
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data FullPostFixE = FPFPrimary PrimaryE [FullPostFixSubE]
                   | FPFFullNew FullNewE [FullPostFixSubE]
                   | FPFSuper SuperE PropertyOp [FullPostFixSubE]
                   | FPFInc PostFixE CToken
                   | FPFDec PostFixE CToken
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data FullPostFixSubE = FPSProperty PropertyOp
                      | FPSArgs Arguments 
                      | FPSQuery QueryOp
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data FullNewE = FN CToken FullNewE Arguments
               | FNPrimary PrimaryE [PropertyOp]
               | FNSuper SuperE [PropertyOp]
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data ShortNewE = SN CToken ShortNewSubE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data ShortNewSubE = SNSFull FullNewE
                   | SNSShort ShortNewE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data PropertyOp = PropertyOp CToken CToken  -- . , identifier
                 | PropertyB CToken ListE CToken -- [ list expression ]
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data QueryOp = QueryOpDD CToken CToken
              | QueryOpD CToken CToken ListE CToken
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data UnaryE = UEPrimary PostFixE
             | UEDelete CToken PostFixE
@@ -147,27 +148,27 @@ data UnaryE = UEPrimary PostFixE
             | UEMinus CToken UnaryE
             | UEBitNot CToken UnaryE
             | UENot CToken UnaryE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data AritE = AEUnary UnaryE
            | AEBinary CToken AritE AritE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data RegE = RegE CToken [CToken] CToken (Maybe CToken)
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data CondE = CondE AritE (Maybe (CToken, AssignE, CToken, AssignE))
            | CondRE RegE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data NAssignE = NAssignE AritE (Maybe (CToken, NAssignE, CToken, NAssignE))
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data AssignE = ACond CondE
              | AAssign PostFixE CToken AssignE
              | ACompound PostFixE CToken AssignE
              | ALogical PostFixE CToken AssignE
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data BlockItem =  Tok        CToken
                 | Expr       AssignE
@@ -179,32 +180,32 @@ data BlockItem =  Tok        CToken
                 | VarS       (Maybe [CToken]) CToken [VarBinding] -- maybe attributes, var, varbindings
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}
                 | Metadata   Metadata
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data Metadata = MDSwf [(CToken, CToken)]
               | MD    CToken CToken [CToken] CToken
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data ForInit = FIListE ListE
              | FIVarS  BlockItem
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data VarBinding = VarBinding CToken CToken AsType (Maybe (CToken, AssignE)) (Maybe CToken) -- identifier, :, datatype, (maybe (=, assignE)), maybe ','
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data Arg = Arg CToken CToken AsType (Maybe (CToken, AssignE)) (Maybe CToken) -- arg name, :, type, maybe default value, maybe comma
          | RestArg CToken CToken (Maybe (CToken, AsType)) -- ..., name
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data Package = Package CToken CToken (Maybe CToken) BlockItem -- whitespace, package, maybe name, block
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data Ast = AS3Program Package AsState
          | AS3Directives [BlockItem] AsState
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 type AsParser = Parsec TList AsState
 
@@ -214,7 +215,7 @@ data AsType = AsType CToken
             | AsTypeRest
             | AsTypeUser CToken
             | AsTypeUnknown
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Data, Typeable)
            
 -- Symbol Lookup key
 data AsDef = DefPackage   Name
@@ -224,7 +225,7 @@ data AsDef = DefPackage   Name
            | DefVar       Name  -- can be for constants too
            | DefNamespace Name  
            | DefNone
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Data, Typeable)
 
 type Attribute = String
 -- Symbol Lookup value
@@ -232,15 +233,15 @@ data AsDefInfo = DiNone             --
                | DiClass    [Attribute] (Maybe AsDef) (Maybe [AsDef]) -- attributes, extends, implements
                | DiFunction [Attribute] 
                | DiVar      AsType
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Data, Typeable)
 
 type AsDefTuple = (AsDef, AsDefInfo)
 
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 data AsState = AsState{ filename::String, outfile::String, curId::Int, flags::Map String String, accessors::Map String (AsType, Bool, Bool), initMembers::[String], path::[Int], scopes::Tree AsStateEl }
-    deriving (Show)
+    deriving (Show, Data, Typeable)
 
 initState :: AsState
 initState = AsState{ filename = "", outfile = "", curId = 0, path = [0], flags = Map.empty, accessors = Map.empty, initMembers = [], scopes = newScope 0}

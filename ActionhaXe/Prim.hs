@@ -21,13 +21,13 @@ import ActionhaXe.Lexer
 import ActionhaXe.Data
 import Text.Parsec
 import Text.Parsec.Prim
+import Text.Parsec.Pos
 
 mytoken :: (Token -> Maybe a) -> AsParser a
 mytoken test = token showTok posFromTok testTok
-             where
-                 showTok (pos, t)    = show t
-                 posFromTok (pos, t) = pos
-                 testTok t           = test t
+    where showTok (pos, t)    = show t
+          posFromTok a@(pos, t) = newPos (tokenSource a) (tokenLine a) (tokenCol a)
+          testTok t         = test t
 
 anytok' = mytoken $ \t -> Just [t]
 
@@ -65,12 +65,6 @@ str' = mytoken $ \t -> case tokenItem t of
                          TokenString x -> Just [t]
                          _ -> Nothing
 
-{-
-reg' = mytoken $ \t -> case tokenItem t of
-                          TokenRegex x -> Just [t]
-                          _ -> Nothing
--}
-
 kw' k = mytoken $ \t -> case tokenItem t of
                            TokenKw k'| k == k' -> Just [t]
                            _ -> Nothing
@@ -86,7 +80,6 @@ xml' = mytoken $ \t -> case tokenItem t of
 idn = mylexeme $ id'
 num = mylexeme $ num'
 str = mylexeme $ str'
---reg = mylexeme $ reg'
 xml = mylexeme $ xml'
 
 mid i = mylexeme $ mid' i
