@@ -259,15 +259,13 @@ memberVarS (VarS ns v b) = do
 varS (VarS ns v b) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
 
 varBinding :: VarBinding -> Bool -> StateT AsState IO String
-varBinding (VarBinding n c d i s) initMember = 
-    do{ i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
+varBinding (VarBinding n dt i s) initMember = 
+    do{ d' <- maybe (return "") (\(c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}) dt
+      ; i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
       ; if i' /= "" && initMember
             then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"
-                   ; d' <- datatypeiM d i
-                   ; return $ showl [n,c] ++ d' ++ maybeEl showb s}
-            else do{ d' <- datatypeiM d i
-                   ; return $ showl [n,c] ++ d' ++ i' ++ maybeEl showb s
-                   }
+                   ; return $ showb n ++ d' ++ maybeEl showb s}
+            else return $ showb n ++ d' ++ i' ++ maybeEl showb s
       }
 
 namespace ns = case ns of 
@@ -304,9 +302,9 @@ datatypeiM d i =
                             "uint"    -> return "UInt"
                             "int"     -> return "Int"
                             "Number"  -> do{ case i of
-                                                 Just (o, e) -> do{ case (hasFloat e) of
-                                                                        True  -> return "Float"
-                                                                        False -> return "Int"
+                                                 Just (o, e) -> do{ if hasFloat e
+                                                                        then return "Float"
+                                                                        else return "Int"
                                                                   } 
                                                  Nothing -> return "Float"
                                            }
@@ -452,6 +450,57 @@ typeENoIn = nonAssignENoIn
 expr (Expr x) = assignE x
 
 forS (ForS k l finit s e s1 e1 r b) = 
+    do if isIterator finit e e1
+           then do let var = findVar finit
+                       start = findInt finit
+                       rop = findROperand e
+                   bound <- maybe (return "") (\r -> do{ r' <- aritE r; return r' }) rop
+                   fblock <- block b
+                   return $ showb k ++ showb l ++ maybeEl showd var ++ " in " ++ maybeEl id start ++ ".." ++ bound ++ showb r ++ fblock
+           else do fheader <- maybe (return "") cforInit finit -- while loop
+                   ftest <-  maybe (return "") listE e
+                   ftail <- maybe (return "") listE e1
+                   fblock <- cforBlock b ftail
+                   ws <- wsBlock b
+                   return $ fheader ++ ";" ++ init ws ++ "while " ++ showb l ++ ftest ++ showb r ++ fblock
+    where cforInit i = do case i of
+                             FIListE l -> listE l >>= return
+                             FIVarS v  -> varS v >>= return
+          cforBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
+                                           ; return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r }
+          wsBlock (Block l bs r) = return $ showw l
+
+--isIterator :: Maybe ForInit -> ListE -> ListE -> Bool
+isIterator fi e e1 = hasInteger fi && hasLessThan e && hasPlusPlus e1
+
+hasInteger = everything (||) (False `mkQ` isInteger)
+
+isInteger (TokenInteger x) = True
+isInteger _ = False
+
+hasLessThan = everything (||) (False `mkQ` isLessThan)
+
+isLessThan (TokenOp x) = x == "<"
+isLessThan _ = False
+
+hasPlusPlus = everything (||) (False `mkQ` isPlusPlus)
+
+isPlusPlus (TokenOp x) = x == "++"
+isPlusPlus _ = False
+
+findVar = everything orElse (Nothing `mkQ` findV)
+findV (VarBinding n _ _ _) = Just n
+
+findInt = everything orElse (Nothing `mkQ` findI)
+findI (TokenInteger x) = Just x
+findI _ = Nothing
+
+findROperand = everything orElse (Nothing `mkQ` findROp)
+findROp (AEBinary op l r) = Just r
+findROp _ = Nothing
+
+{-
+forS (ForS k l finit s e s1 e1 r b) = 
     do{ fheader <- maybe (return "") forInit finit
       ; ftest <-  maybe (return "") listE e
       ; ftail <- maybe (return "") listE e1
@@ -465,3 +514,4 @@ forS (ForS k l finit s e s1 e1 r b) =
           forBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
                                            ; return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r }
           wsBlock (Block l bs r) = return $ showw l
+-}

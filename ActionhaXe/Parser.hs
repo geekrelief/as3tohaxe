@@ -174,7 +174,13 @@ varS = try(do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const
 varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
 
-varBinding = do{ n <- idn; c <- op ":"; dt <- datatype; i <- optionMaybe (do{ o <- op "="; e <- assignE; return $ (o, e)}); s <- optionMaybe (op ","); storeVar n dt; return $ VarBinding n c dt i s }
+varBinding = try(do{ n <- idn
+                   ; t <- optionMaybe(do{c <- op ":"; dt <- datatype; return (c, dt)})
+                   ; i <- optionMaybe (do{ o <- op "="; e <- assignE; return $ (o, e)})
+                   ; s <- optionMaybe (op ",")
+                   ; return $ VarBinding n t i s 
+                   }
+                )
 
 datatype = try(do{ t <- kw "void";      return $ AsType t})
        <|> try(do{ t <- mid "int";      return $ AsType t})

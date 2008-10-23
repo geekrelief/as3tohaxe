@@ -190,7 +190,7 @@ data ForInit = FIListE ListE
              | FIVarS  BlockItem
     deriving (Show, Data, Typeable)
 
-data VarBinding = VarBinding CToken CToken AsType (Maybe (CToken, AssignE)) (Maybe CToken) -- identifier, :, datatype, (maybe (=, assignE)), maybe ','
+data VarBinding = VarBinding   CToken (Maybe (CToken, AsType)) (Maybe (CToken, AssignE)) (Maybe CToken) --varbinding with Type-- identifier, (maybe (:, datatype)), (maybe (=, assignE)), maybe ','
     deriving (Show, Data, Typeable)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
@@ -214,6 +214,7 @@ type AsParser = Parsec TList AsState
 data AsType = AsType CToken
             | AsTypeRest
             | AsTypeUser CToken
+            | AsTypeNone
             | AsTypeUnknown
     deriving (Show, Eq, Ord, Data, Typeable)
            
