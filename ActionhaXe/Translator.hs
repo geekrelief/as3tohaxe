@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -}
--- Translate an Actionscript 3 AST to haXe and hxml for Flash 9
+-- Translate an Actionscript 3 AST to haXe and hxml for Flash 10
 
 module ActionhaXe.Translator where
 
@@ -319,10 +319,6 @@ datatypeiM d i =
                       }
         AsTypeRest -> return $ "Array<Dynamic>"
         AsTypeUser n -> return $ showb n
-{-        AsTypeNone -> case i of
-                          Just (o, e) ->
-                          Nothing -> "Dynamic"
--}
 
 hasFloat = everything (||) (False `mkQ` isFloat)
 
@@ -451,17 +447,19 @@ expr (Expr x) = assignE x
 
 forS (ForS k l finit s e s1 e1 r b) = 
     do if isIterator finit e e1
-           then do let var = findVar finit
+           then do let var = findVar finit 
                        start = findInt finit
                        rop = findROperand e
                    bound <- maybe (return "") (\r -> do{ r' <- aritE r; return r' }) rop
                    fblock <- block b
+-- convert to iterator
                    return $ showb k ++ showb l ++ maybeEl showd var ++ " in " ++ maybeEl id start ++ ".." ++ bound ++ showb r ++ fblock
-           else do fheader <- maybe (return "") cforInit finit -- while loop
+           else do fheader <- maybe (return "") cforInit finit
                    ftest <-  maybe (return "") listE e
                    ftail <- maybe (return "") listE e1
                    fblock <- cforBlock b ftail
                    ws <- wsBlock b
+-- convert to while
                    return $ fheader ++ ";" ++ init ws ++ "while " ++ showb l ++ ftest ++ showb r ++ fblock
     where cforInit i = do case i of
                              FIListE l -> listE l >>= return
@@ -470,7 +468,6 @@ forS (ForS k l finit s e s1 e1 r b) =
                                            ; return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r }
           wsBlock (Block l bs r) = return $ showw l
 
---isIterator :: Maybe ForInit -> ListE -> ListE -> Bool
 isIterator fi e e1 = hasInteger fi && hasLessThan e && hasPlusPlus e1
 
 hasInteger = everything (||) (False `mkQ` isInteger)
@@ -498,20 +495,3 @@ findI _ = Nothing
 findROperand = everything orElse (Nothing `mkQ` findROp)
 findROp (AEBinary op l r) = Just r
 findROp _ = Nothing
-
-{-
-forS (ForS k l finit s e s1 e1 r b) = 
-    do{ fheader <- maybe (return "") forInit finit
-      ; ftest <-  maybe (return "") listE e
-      ; ftail <- maybe (return "") listE e1
-      ; fblock <- forBlock b ftail
-      ; ws <- wsBlock b
-      ; return $ fheader ++ ";" ++ init ws ++ "while " ++ showb l ++ ftest ++ showb r ++ fblock
-      }
-    where forInit i = do case i of
-                             FIListE l -> listE l >>= return
-                             FIVarS v  -> varS v >>= return
-          forBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
-                                           ; return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r }
-          wsBlock (Block l bs r) = return $ showw l
--}

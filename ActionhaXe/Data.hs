@@ -214,7 +214,6 @@ type AsParser = Parsec TList AsState
 data AsType = AsType CToken
             | AsTypeRest
             | AsTypeUser CToken
-            | AsTypeNone
             | AsTypeUnknown
     deriving (Show, Eq, Ord, Data, Typeable)
            
