@@ -24,7 +24,7 @@ Requirements
 - Cabal for parsec http://www.haskell.org/cabal/
 - parsec 3 http://hackage.haskell.org/cgi-bin/hackage-scripts/package/parsec
 
-Running: ghc --make as3tohaxe.hs 
+Running: ghc --make -XDeriveDataTypeable as3tohaxe.hs
 will produce the binary 'as3tohaxe'
 
 -- License --
