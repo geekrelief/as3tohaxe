@@ -253,20 +253,49 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
 
 memberVarS (VarS ns v b) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
-        then do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
+        then do{ b' <- foldlM (\s x -> do{ x' <- varBinding x False; return $ s ++ x'}) "" b
+               ; let inl = if hasPrimitive b then "inline " else ""
+               ; return $ inl ++ namespace ns ++ "var" ++ showw v ++ b'}
         else do{ b' <- foldlM (\s x -> do{ x' <- varBinding x True; return $ s ++ x'}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
+
+hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
+
+hasPrimitive' (TokenNum _) = True
+hasPrimitive' (TokenString _) = True
+hasPrimitive' (TokenKw "true") = True
+hasPrimitive' (TokenKw "false") = True
+hasPrimitive' _ = False
 
 varS (VarS ns v b) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
 
 varBinding :: VarBinding -> Bool -> StateT AsState IO String
 varBinding (VarBinding n dt i s) initMember = 
-    do{ d' <- maybe (return "") (\(c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}) dt
+    --do{ d' <- maybe (return "") (\(c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}) dt
+    do{ d' <- case dt of
+                  Just (c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}
+                  Nothing -> case i of
+                                 Just (o, e) -> do let e' = getType e
+                                                   case e' of
+                                                       Just t -> return $ ":" ++ t ++ " "
+                                                       Nothing -> return ":Dynamic "
+                                 Nothing -> return ":Dynamic "
       ; i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
       ; if i' /= "" && initMember
             then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"
-                   ; return $ showb n ++ d' ++ maybeEl showb s}
-            else return $ showb n ++ d' ++ i' ++ maybeEl showb s
+                   ; return $ showd n ++ d' ++ maybeEl showb s}
+            else return $ showd n ++ d' ++ i' ++ maybeEl showb s
       }
+
+getType = everything orElse ((Nothing `mkQ` getTypeTokenNum) `extQ` getTypeTokenType)
+
+getTypeTokenNum (TokenDouble x) = Just "Float"
+getTypeTokenNum (TokenInteger x) = Just "Int"
+getTypeTokenNum (TokenHex x) = Just "Int"
+getTypeTokenNum (TokenOctal x) = Just "Int"
+getTypeTokenType (TokenString x) = Just "String"
+getTypeTokenType (TokenKw "true") = Just "Bool"
+getTypeTokenType (TokenKw "false") = Just "Bool"
+getTypeTokenType _ = Nothing
 
 namespace ns = case ns of 
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
