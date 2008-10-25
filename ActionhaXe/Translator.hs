@@ -482,7 +482,7 @@ forS (ForS k l finit s e s1 e1 r b) =
                    bound <- maybe (return "") (\r -> do{ r' <- aritE r; return r' }) rop
                    fblock <- block b
 -- convert to iterator
-                   return $ showb k ++ showb l ++ maybeEl showd var ++ " in " ++ maybeEl id start ++ ".." ++ bound ++ showb r ++ fblock
+                   return $ showb k ++ showb l ++ maybeEl showd var ++ " in " ++ maybeEl id start ++ "..." ++ bound ++ showb r ++ fblock
            else do fheader <- maybe (return "") cforInit finit
                    ftest <-  maybe (return "") listE e
                    ftail <- maybe (return "") listE e1
