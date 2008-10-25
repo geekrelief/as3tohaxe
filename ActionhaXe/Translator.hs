@@ -74,7 +74,7 @@ directives ds = foldlM (\str i -> do{s <- directive i; return $ str++s}) "" ds
                             ImportDecl _ _ _            -> return $ importDecl d
                             Metadata m                  -> metadata m >>= return
                             MethodDecl _ _ _ _ _ _      -> methodDecl d >>= return
-                            VarS _ _ _                  -> memberVarS d >>= return
+                            VarS _ _ _ _                -> memberVarS d >>= return
                             _                           -> return "--unexpected directive--"
 
 --program :: Package -> StateT AsState IO String
@@ -131,7 +131,7 @@ classBlockItem b =
     do x <- case b of
                 Tok t                       -> tok t >>= return
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
-                VarS _ _ _                  -> memberVarS b >>= return
+                VarS _ _ _ _                -> memberVarS b >>= return
                 Metadata m                  -> metadata m >>= return
                 _                           -> return $ show b
        return x
@@ -148,7 +148,7 @@ blockItem b =
     do x <- case b of
                 Tok t                       -> tok t >>= return
                 Block _ _ _                 -> block b >>= return
-                VarS _ _ _                  -> varS b >>= return
+                VarS _ _ _ _                -> varS b >>= return
                 ForS _ _ _ _ _ _ _ _ _      -> forS b >>= return
                 Expr _                      -> expr b >>= return
                 Metadata m                  -> metadata m >>= return
@@ -251,12 +251,13 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
                                        }
           showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
-memberVarS (VarS ns v b) = do 
+memberVarS (VarS ns k v vs) = do 
     if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
-        then do{ b' <- foldlM (\s x -> do{ x' <- varBinding x False; return $ s ++ x'}) "" b
-               ; let inl = if hasPrimitive b then "inline " else ""
-               ; return $ inl ++ namespace ns ++ "var" ++ showw v ++ b'}
-        else do{ b' <- foldlM (\s x -> do{ x' <- varBinding x True; return $ s ++ x'}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
+        then do{ v' <- varBinding v False
+               ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s ++ showb c ++ x'}) "" vs
+               ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) then "inline " else ""
+               ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
+        else do{ vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x True; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ vs'}
 
 hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
 
@@ -266,24 +267,23 @@ hasPrimitive' (TokenKw "true") = True
 hasPrimitive' (TokenKw "false") = True
 hasPrimitive' _ = False
 
-varS (VarS ns v b) = do{ b' <- foldrM (\x s -> do{ x' <- varBinding x False; return $ x' ++ s}) "" b; return $ namespace ns ++ "var" ++ showw v ++ b'}
+varS (VarS ns k v vs) = do{ v' <- varBinding v False; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s++ showb c ++x' }) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 
 varBinding :: VarBinding -> Bool -> StateT AsState IO String
-varBinding (VarBinding n dt i s) initMember = 
-    --do{ d' <- maybe (return "") (\(c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}) dt
+varBinding (VarBinding n dt i) initMember = 
     do{ d' <- case dt of
                   Just (c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}
-                  Nothing -> case i of
+                  Nothing -> case i of -- try to determine type from initializer
                                  Just (o, e) -> do let e' = getType e
                                                    case e' of
-                                                       Just t -> return $ ":" ++ t ++ " "
-                                                       Nothing -> return ":Dynamic "
-                                 Nothing -> return ":Dynamic "
+                                                       Just t -> return $ ":" ++ t ++ showw n -- set type to initializer's type
+                                                       Nothing -> return $ ":Dynamic" ++ showw n -- can't determine type
+                                 Nothing -> return $ ":Dynamic" ++ showw n -- no datatype, no initializer
       ; i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
       ; if i' /= "" && initMember
             then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"
-                   ; return $ showd n ++ d' ++ maybeEl showb s}
-            else return $ showd n ++ d' ++ i' ++ maybeEl showb s
+                   ; return $ showd n ++ d' }
+            else return $ showd n ++ d' ++ i'
       }
 
 getType = everything orElse ((Nothing `mkQ` getTypeTokenNum) `extQ` getTypeTokenType)
@@ -515,7 +515,7 @@ isPlusPlus (TokenOp x) = x == "++"
 isPlusPlus _ = False
 
 findVar = everything orElse (Nothing `mkQ` findV)
-findV (VarBinding n _ _ _) = Just n
+findV (VarBinding n _ _) = Just n
 
 findInt = everything orElse (Nothing `mkQ` findI)
 findI (TokenInteger x) = Just x

@@ -169,7 +169,13 @@ defval' = try( do{ x <- kw "null"; return x})
       <|> do{ x <- num; return x}
 -}
 
-varS = try(do{ ns <- optionMaybe(varAttributes); k <- choice[kw "var", kw "const"]; b <- many1 varBinding; return $ VarS ns k b })
+varS = try(do{ ns <- optionMaybe(varAttributes)
+             ; k <- choice[kw "var", kw "const"]
+             ; v <- varBinding
+             ; vs <- many (do{ s <- op ","; v <- varBinding; return (s, v)})
+             ; return $ VarS ns k v vs 
+             }
+          )
 
 varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
@@ -177,8 +183,7 @@ varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private
 varBinding = try(do{ n <- idn
                    ; t <- optionMaybe(do{c <- op ":"; dt <- datatype; return (c, dt)})
                    ; i <- optionMaybe (do{ o <- op "="; e <- assignE; return $ (o, e)})
-                   ; s <- optionMaybe (op ",")
-                   ; return $ VarBinding n t i s 
+                   ; return $ VarBinding n t i
                    }
                 )
 

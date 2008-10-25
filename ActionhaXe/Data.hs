@@ -177,7 +177,7 @@ data BlockItem =  Tok        CToken
                 | ClassDecl  [CToken] CToken CToken (Maybe [CToken]) (Maybe [CToken]) BlockItem -- attributes, class, identifier, maybe extends, maybe implements, body
                 | Interface  [CToken] CToken CToken (Maybe [CToken]) BlockItem -- public | internal, interface, identifier, maybe extends, body
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
-                | VarS       (Maybe [CToken]) CToken [VarBinding] -- maybe attributes, var, varbindings
+                | VarS       (Maybe [CToken]) CToken VarBinding [(CToken, VarBinding)] -- maybe attributes, var, varbinding, [(',', varbinding)]
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}
                 | Metadata   Metadata
     deriving (Show, Data, Typeable)
@@ -190,7 +190,7 @@ data ForInit = FIListE ListE
              | FIVarS  BlockItem
     deriving (Show, Data, Typeable)
 
-data VarBinding = VarBinding   CToken (Maybe (CToken, AsType)) (Maybe (CToken, AssignE)) (Maybe CToken) --varbinding with Type-- identifier, (maybe (:, datatype)), (maybe (=, assignE)), maybe ','
+data VarBinding = VarBinding   CToken (Maybe (CToken, AsType)) (Maybe (CToken, AssignE)) --varbinding with Type-- identifier, (maybe (:, datatype)), (maybe (=, assignE)), maybe ','
     deriving (Show, Data, Typeable)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
