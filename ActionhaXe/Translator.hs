@@ -257,7 +257,7 @@ memberVarS (VarS ns k v vs) = do
                ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s ++ showb c ++ x'}) "" vs
                ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) then "inline " else ""
                ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
-        else do{ v' <- varBinding v False; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x True; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
+        else do{ v' <- varBinding v True; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x True; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 
 hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
 
@@ -285,6 +285,8 @@ varBinding (VarBinding n dt i) initMember =
                    ; return $ showd n ++ d' }
             else return $ showd n ++ d' ++ i'
       }
+
+
 
 getType = everything orElse ((Nothing `mkQ` getTypeTokenNum) `extQ` getTypeTokenType)
 
