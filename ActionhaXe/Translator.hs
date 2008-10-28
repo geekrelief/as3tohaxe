@@ -31,6 +31,8 @@ import Data.List (intercalate)
 import Data.Char (toUpper, isAlphaNum)
 import Data.Generics -- not Haskell 98
 
+import Text.Regex
+
 -- flags
 mainPackage = "mainPackage"
 fpackage  = "packageName"
@@ -62,6 +64,8 @@ getMembers = do st <- get
 
 maybeEl f i = maybe "" (\m -> f m) i
 
+cleanup s = subRegex (mkRegex "\\$") s "_S_"
+
 --translateAs3Ast :: Ast -> StateT AsState IO String
 translateAs3Ast p = 
     case p of 
@@ -70,17 +74,17 @@ translateAs3Ast p =
 
 directives ds = foldlM (\str i -> do{s <- directive i; return $ str++s}) "" ds
     where directive d = case d of
-                            Tok t                       -> tok t >>= return
-                            ImportDecl _ _ _            -> return $ importDecl d
-                            Metadata m                  -> metadata m >>= return
-                            MethodDecl _ _ _ _ _ _      -> methodDecl d >>= return
-                            VarS _ _ _ _                -> memberVarS d >>= return
+                            Tok t                       -> do{ t' <- tok t; return $ cleanup t'}
+                            ImportDecl _ _ _            -> return $ cleanup $ importDecl d
+                            Metadata m                  -> do{ m' <- metadata m; return $ cleanup m'}
+                            MethodDecl _ _ _ _ _ _      -> do{ d' <- methodDecl d; return $ cleanup d'}
+                            VarS _ _ _ _                -> do{ d' <- memberVarS d; return $ cleanup d'}
                             _                           -> return "--unexpected directive--"
 
 --program :: Package -> StateT AsState IO String
 program (Package w p n b) = do case n of
-                                 Just ntok -> do{ updateFlag fpackage $ showd ntok ; x <- packageBlock b; return $ showb w ++ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ x}
-                                 Nothing   -> do{ updateFlag fpackage mainPackage; x <-packageBlock b; return $ showb w ++ showw p ++ x}
+                                 Just ntok -> do{ updateFlag fpackage $ showd ntok ; x <- packageBlock b; return $ cleanup $ showb w ++ showd p ++" "++ showd ntok ++ ";" ++ showw ntok ++ x}
+                                 Nothing   -> do{ updateFlag fpackage mainPackage; x <-packageBlock b; return $ cleanup $ showb w ++ showw p ++ x}
 
 packageBlock (Block l bs r)  = do 
     bi <- foldlM (\s b -> do{ x <- packageBlockItem b; return $ s ++ x} ) "" bs 
@@ -252,12 +256,13 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
           showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
 memberVarS (VarS ns k v vs) = do 
-    if maybe False (\x -> elem "static" (map (\n -> showd n) x )) ns
+    if maybe False (namespaceHas "static") ns
         then do{ v' <- varBinding v False
                ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s ++ showb c ++ x'}) "" vs
                ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) then "inline " else ""
                ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
         else do{ v' <- varBinding v True; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x True; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
+    where namespaceHas s ns = elem s (map (\n -> showd n) ns)
 
 hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
 
@@ -483,7 +488,7 @@ forS (ForS k l finit s e s1 e1 r b) =
                        rop = findROperand e
                    bound <- maybe (return "") (\r -> do{ r' <- aritE r; return r' }) rop
                    fblock <- block b
--- convert to iterator
+-- convert to iterator ?? are iterators slower?
                    return $ showb k ++ showb l ++ maybeEl showd var ++ " in " ++ maybeEl id start ++ "..." ++ bound ++ showb r ++ fblock
            else do fheader <- maybe (return "") cforInit finit
                    ftest <-  maybe (return "") listE e
@@ -516,8 +521,10 @@ hasPlusPlus = everything (||) (False `mkQ` isPlusPlus)
 isPlusPlus (TokenOp x) = x == "++"
 isPlusPlus _ = False
 
-findVar = everything orElse (Nothing `mkQ` findV)
-findV (VarBinding n _ _) = Just n
+findVar = everything orElse ((Nothing `mkQ` findVB) `extQ` findVA)
+findVB (VarBinding n _ _) = Just n
+findVA (PEIdent n) = Just n
+findVA _ = Nothing
 
 findInt = everything orElse (Nothing `mkQ` findI)
 findI (TokenInteger x) = Just x
