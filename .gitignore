@@ -10,3 +10,6 @@ template
 *.hx
 as3tohaxe-mac.zip
 as3tohaxe-win.zip
+as3tohaxe
+header
+prepend

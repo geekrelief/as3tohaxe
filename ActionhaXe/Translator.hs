@@ -194,17 +194,17 @@ classDecl (ClassDecl a c n e i b) = do
     updateFlag fclass $ showd n
     updateFlag fclassAttr $ publicAttr a
     x <- classBlock b
-    let e' = maybe [] (\(k, c) -> [showb k ++ showd c] ) e
+    let e' = maybe [] (\(k, c) -> if showd c == "Object" then [] else [showb k ++ showd c] ) e
     let i' = maybe [] (\(ic, cs) -> map (\(x, co) -> showb ic ++ showd x) cs ) i
-    let ei = intercalate ", " $ filter (\x -> length x > 0) $ e'++i'
+    let i'' = i' ++ if "dynamic" `elem` map (\a' -> showd a') a then ["implements Dynamic<Dynamic>"] else [""]
+    let ei = intercalate ", " $ filter (\x -> length x > 0) $ e'++i''
     return $ attr a ++ showb c ++ showb n ++ ei ++ " " ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
-          attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
-          
+          attr as = concat $ map (\attr -> case (showd attr) of { "dynamic" -> ""; "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
 
 interface (Interface a i n e b) = do
     x <- interfaceBlock b
-    let e' = maybe "" (\(e, c) -> showd c ) e
+    let e' = maybe "" (\(e, c) -> "implements "++showd c ) e
     return $ attr a ++ showb i ++ showb n ++ e' ++ x
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
 
