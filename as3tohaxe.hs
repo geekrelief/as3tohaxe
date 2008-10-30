@@ -84,16 +84,3 @@ main = do args <- parseArgsIO ArgsTrailing clargs
                       unless dirExists ((createDirectoryIfMissing True outdir) >> putStrLn ("Created " ++ outdir))
                       runStateT (translateFile input) conf
               else runStateT (translateDir input) conf
-
-{-        args <- getArgs
-          if length args == 0
-              then do putStrLn "as3tohaxe Copyright (c) 2008 Don-Duong Quach\nUsage: as3tohaxe [directory | filename]"
-                      exitWith ExitSuccess
-              else return ()
-          if isSuffixOf ".as" (args!!0)
-              then do
-                       dirExists <- doesDirectoryExist outdir
-                       unless dirExists ((createDirectoryIfMissing True outdir) >> putStrLn ("Created " ++ outdir))
-                       translateFile $ args!!0
-              else translateDir $ args!!0
--}
