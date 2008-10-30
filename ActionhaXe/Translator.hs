@@ -194,14 +194,18 @@ classDecl (ClassDecl a c n e i b) = do
     updateFlag fclass $ showd n
     updateFlag fclassAttr $ publicAttr a
     x <- classBlock b
-    return $ attr a ++ showb c ++ showb n ++ maybeEl showl e ++ implements i ++ x 
+    let e' = maybe [] (\(k, c) -> [showb k ++ showd c] ) e
+    let i' = maybe [] (\(ic, cs) -> map (\(x, co) -> showb ic ++ showd x) cs ) i
+    let ei = intercalate ", " $ filter (\x -> length x > 0) $ e'++i'
+    return $ attr a ++ showb c ++ showb n ++ ei ++ " " ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
           attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
-          implements is = maybeEl showl is
+          
 
 interface (Interface a i n e b) = do
     x <- interfaceBlock b
-    return $ attr a ++ showb i ++ showb n ++ maybeEl showl e ++ x
+    let e' = maybe "" (\(e, c) -> showd c ) e
+    return $ attr a ++ showb i ++ showb n ++ e' ++ x
     where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
 
 methodDecl (MethodDecl a f ac n s b) = do 

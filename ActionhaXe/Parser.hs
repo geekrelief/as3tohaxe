@@ -133,10 +133,10 @@ classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMa
 classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "internal"))) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "dynamic")
     where list v s d = filter (\a -> fst a /= []) [v,s,d]
 
-classExtends = do{ k <- kw "extends"; s <- nident; return $ k:[s]}
+classExtends = do{ k <- kw "extends"; s <- nident; return $ (k, s)}
 
 -- need to fix this so it returns a tuple to classDecl
-classImplements = do{ k <- kw "implements"; s <- sepByCI1 nident (op ","); return $ k:s} 
+classImplements = do{ k <- kw "implements"; s <- many1 (do{n <- nident; c <- optionMaybe (op ","); return (n,c)}); return $ (k,s) } 
 
 methodDecl = try(do{ attr <- methodAttributes
                ; k <- kw "function"
