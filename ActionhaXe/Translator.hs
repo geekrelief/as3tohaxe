@@ -23,6 +23,9 @@ import ActionhaXe.Lexer
 import ActionhaXe.Data
 import ActionhaXe.Prim
 import ActionhaXe.Parser
+import ActionhaXe.CLArgs
+import qualified System.Console.ParseArgs as PA
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -62,6 +65,9 @@ getMembers = do st <- get
                 put st{initMembers = []}
                 return ret
 
+getCLArg f = do st <- get
+                return $ PA.gotArg (confArgs (conf st)) f
+
 maybeEl f i = maybe "" (\m -> f m) i
 
 cleanup s = subRegex (mkRegex "\\$") s "_S_"
@@ -94,10 +100,13 @@ classBlock (Block l bs r)  = do
     x <- get
     let a = accessors x
     let al = Map.toList a
-    let props = foldl (\str (k, (t, g, s)) -> str ++ showws l ++ "public var " ++ k ++ "(" 
-                                          ++ (if g then "get"++ [toUpper $ head k] ++ tail k else "null") ++ ", "
-                                          ++ (if s then "set"++ [toUpper $ head k] ++ tail k else "null") 
-                                          ++ ") : " ++ datatype t ++ ";") "" al
+    props <- foldlM (\str (k, (t, g, s)) -> do{ t' <- datatype t
+                                              ; return $ str ++ showws l ++ "public var " ++ k ++ "(" 
+                                                         ++ (if g then "get"++ [toUpper $ head k] ++ tail k else "null") ++ ", "
+                                                         ++ (if s then "set"++ [toUpper $ head k] ++ tail k else "null") 
+                                                         ++ ") : " ++ t' ++ ";"
+                                              }
+                     ) "" al
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
     return $ showd l ++ props ++ showw l ++ bi ++ showb r
 
@@ -218,8 +227,9 @@ methodDecl (MethodDecl a f ac n s b) = do
           accessor ac name s@(Signature l args r ret) t = 
               case ac of
                   Just x -> do{ a <- showArgs args
+                              ; t' <- datatypet t
                               ; return $ showd x ++ [toUpper $ head $ showd name] ++ tail (showb name) ++ showb l ++ a ++ showd r ++ ":" 
-                                ++ fst (datatypet t) ++ (case ret of { Just (c, t) -> snd (datatypet t); Nothing -> showw r})
+                                ++ fst t' ++ (case ret of { Just (c, t) -> snd t'; Nothing -> showw r})
                               }
                   Nothing -> do{ s' <- signature s; return $ showb name ++ s'}
           accblock arg ac (Block l bs r) = 
@@ -241,11 +251,12 @@ signatureArgs (Signature l args r ret) = do{ a <- showArgs args
                                            }
 
 rettype ret = case ret of
-                  Just (c, t) -> showb c ++ datatype t
-                  Nothing     -> ""
+                  Just (c, t) -> do{ t' <- datatype t; return $ showb c ++ t'}
+                  Nothing     -> return ""
 
 signature (Signature l args r ret) = do{ a <- showArgs args
-                                       ; return $ showb l ++ a ++ showb r ++ rettype ret
+                                       ; ret' <- rettype ret
+                                       ; return $ showb l ++ a ++ showb r ++ ret'
                                        }
 
 showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
@@ -308,28 +319,33 @@ namespace ns = case ns of
                    Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
                    Nothing -> ""
 
-datatypet d = span (\c -> isAlphaNum c || c =='>' || c == '<') (datatype d)
+datatypet d = do{ d' <- datatype d; return $ span (\c -> isAlphaNum c || c =='>' || c == '<') d'}
 
+datatype :: AsType -> StateT AsState IO String
 datatype d = 
     case d of
-        AsType n -> (case (showd n) of
-                         "void"    -> "Void"
-                         "Boolean" -> "Bool"
-                         "uint"    -> "UInt"
-                         "int"     -> "Int"
-                         "Number"  -> "Number"
-                         "String"  -> "String"
-                         "*"       -> "Dynamic"
-                         "Object"  -> "Dynamic"
-                         "Function"-> "Dynamic"
-                         "Array"   -> "Array<Dynamic>"
-                         "XML"     -> "XML"
-                         "RegExp"  -> "EReg"
-                      ) ++ showw n
-        AsTypeRest -> "Array<Dynamic>"
-        AsTypeUser n -> showb n
+        AsType n -> do d' <- (case (showd n) of 
+                                  "void"    -> return "Void"
+                                  "Boolean" -> return "Bool"
+                                  "uint"    -> return "UInt"
+                                  "int"     -> return "Int"
+                                  "Number"  -> do ni <- getCLArg NumberToInt
+                                                  if ni
+                                                       then return "Int"
+                                                       else return "Float"
+                                  "String"  -> return "String"
+                                  "*"       -> return "Dynamic"
+                                  "Object"  -> return "Dynamic"
+                                  "Function"-> return "Dynamic"
+                                  "Array"   -> return "Array<Dynamic>"
+                                  "XML"     -> return "XML"
+                                  "RegExp"  -> return "EReg"
+                              )
+                       return $ d' ++ showw n
+        AsTypeRest -> return "Array<Dynamic>"
+        AsTypeUser n -> return $ showb n
 
-datatypeiM d Nothing = return $ datatype d
+datatypeiM d Nothing = datatype d
 datatypeiM d i = 
     case d of
         AsType n -> do{ r <- case (showd n) of
@@ -337,13 +353,16 @@ datatypeiM d i =
                             "Boolean" -> return "Bool"
                             "uint"    -> return "UInt"
                             "int"     -> return "Int"
-                            "Number"  -> do{ case i of
+                            "Number"  -> do  case i of
                                                  Just (o, e) -> do{ if hasFloat e
                                                                         then return "Float"
                                                                         else return "Int"
                                                                   } 
-                                                 Nothing -> return "Float"
-                                           }
+                                                 Nothing -> do ni <- getCLArg NumberToInt
+                                                               if ni
+                                                                   then return "Int"
+                                                                   else return "Float"
+                                           
                             "String"  -> return "String"
                             "*"       -> return "Dynamic"
                             "Object"  -> return "Dynamic"

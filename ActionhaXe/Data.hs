@@ -18,6 +18,8 @@
 module ActionhaXe.Data where
 
 import ActionhaXe.Lexer
+import ActionhaXe.CLArgs
+
 import Text.Parsec
 import Text.Parsec.Prim
 
@@ -240,11 +242,11 @@ type AsDefTuple = (AsDef, AsDefInfo)
 data AsStateEl = AsStateEl { sid::Int, scope::Map AsDef AsDefInfo }
     deriving (Show, Data, Typeable)
 
-data AsState = AsState{ filename::String, outfile::String, curId::Int, flags::Map String String, accessors::Map String (AsType, Bool, Bool), initMembers::[String], path::[Int], scopes::Tree AsStateEl }
+data AsState = AsState{ conf::Conf, filename::String, outfile::String, curId::Int, flags::Map String String, accessors::Map String (AsType, Bool, Bool), initMembers::[String], path::[Int], scopes::Tree AsStateEl }
     deriving (Show, Data, Typeable)
 
 initState :: AsState
-initState = AsState{ filename = "", outfile = "", curId = 0, path = [0], flags = Map.empty, accessors = Map.empty, initMembers = [], scopes = newScope 0}
+initState = AsState{ conf = ConfNone, filename = "", outfile = "", curId = 0, path = [0], flags = Map.empty, accessors = Map.empty, initMembers = [], scopes = newScope 0}
 
 getProperty name = 
     do x <- getState
