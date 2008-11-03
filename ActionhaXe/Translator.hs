@@ -198,15 +198,13 @@ classDecl (ClassDecl a c n e i b) = do
     let i' = maybe [] (\(ic, cs) -> map (\(x, co) -> showb ic ++ showd x) cs ) i
     let i'' = i' ++ if "dynamic" `elem` map (\a' -> showd a') a then ["implements Dynamic<Dynamic>"] else [""]
     let ei = intercalate ", " $ filter (\x -> length x > 0) $ e'++i''
-    return $ attr a ++ showb c ++ showb n ++ ei ++ " " ++ x 
+    return $ namespace a ++ showb c ++ showb n ++ ei ++ " " ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
-          attr as = concat $ map (\attr -> case (showd attr) of { "dynamic" -> ""; "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
 
 interface (Interface a i n e b) = do
     x <- interfaceBlock b
     let e' = maybe "" (\(e, c) -> "implements "++showd c ) e
-    return $ attr a ++ showb i ++ showb n ++ e' ++ x
-    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "public" -> ""; x -> showb attr }) as
+    return $ namespace a ++ showb i ++ showb n ++ e' ++ x
 
 methodDecl (MethodDecl a f ac n s b) = do 
     packageName <- getFlag fpackage
@@ -215,7 +213,7 @@ methodDecl (MethodDecl a f ac n s b) = do
     if packageName == mainPackage && className == (showd n) && classAttr == "public"
         then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
-                 then do{ x <- maybe (return "") constructorBlock b; s' <- signatureArgs s; return $ attr a ++ showb f ++ "new"++showw n ++ s' ++ x }
+                 then do{ x <- maybe (return "") constructorBlock b; s' <- signatureArgs s; return $ namespace a ++ showb f ++ "new"++showw n ++ s' ++ x }
                  else do st <- get
                          let accMap = accessors st
                          if Map.member (showd n) accMap
@@ -223,12 +221,11 @@ methodDecl (MethodDecl a f ac n s b) = do
                                       let arg = getArg s
                                       x <- maybe (return "" ) (accblock arg ac) b
                                       acc' <- accessor ac n s t
-                                      return $ attr a ++ showb f ++ acc' ++ x 
+                                      return $ namespace a ++ showb f ++ acc' ++ x 
                               else do x <- maybe (return "") block b
                                       s' <- signature s
-                                      return $ attr a ++ showb f ++ showb n ++ s' ++ x
-    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; "protected" -> "public" ++ showw attr; x -> showb attr }) as
-          accessor ac name s@(Signature l args r ret) t = 
+                                      return $ namespace a ++ showb f ++ showb n ++ s' ++ x
+    where accessor ac name s@(Signature l args r ret) t = 
               case ac of
                   Just x -> do{ a <- showArgs args
                               ; t' <- datatypet t
@@ -271,13 +268,12 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
           showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
 memberVarS (VarS ns k v vs) = do 
-    if maybe False (namespaceHas "static") ns
+    if elem "static" (map (\n -> showd n) ns)
         then do{ v' <- varBinding v False
                ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s ++ showb c ++ x'}) "" vs
                ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) then "inline " else ""
                ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
         else do{ v' <- varBinding v True; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x True; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
-    where namespaceHas s ns = elem s (map (\n -> showd n) ns)
 
 hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
 
@@ -319,9 +315,14 @@ getTypeTokenType (TokenKw "true") = Just "Bool"
 getTypeTokenType (TokenKw "false") = Just "Bool"
 getTypeTokenType _ = Nothing
 
-namespace ns = case ns of 
-                   Just x -> concat $ map (\n -> (case (showd n) of { "protected" -> "public"; _ -> showd n})  ++ showw n) x
-                   Nothing -> ""
+namespace ns = concat $ map (\attr -> (case showd attr of { "dynamic" -> ""
+                                                          ; "final" -> ""
+                                                          ; "protected" -> ""
+                                                          ; "internal" -> "private" ++ showw attr
+                                                          ; "public" -> ""
+                                                          ; _ -> showb attr 
+                                                          }
+                                      ) ) ns
 
 datatypet d = do{ d' <- datatype d; return $ span (\c -> isAlphaNum c || c =='>' || c == '<') d'}
 

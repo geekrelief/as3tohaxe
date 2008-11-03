@@ -25,8 +25,8 @@ package example
 	public class AsWingApplication extends Sprite
 	{
 		private static var labelPrefix : String = "Number of button clicks: ";
-	    private var numClicks : int = 0;
-	    private var label : JLabel;
+		private var numClicks : int = 0;
+		private var label : JLabel;
 		private var button : JButton;
 		
 		public function AsWingApplication(){
@@ -39,7 +39,6 @@ package example
 			frame.getContentPane().append( createCenterPane() );
 			frame.setSize(new IntDimension( 200, 120 ) );
 			frame.show();
-	    	var test : int = 0;
 		}
 		
 		private function createCenterPane() : JPanel{

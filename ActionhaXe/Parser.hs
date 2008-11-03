@@ -158,18 +158,7 @@ sigargs = do{ s <- many sigarg; return s}
 sigarg = try(do{ a <- idn; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o <- op "="; a <- assignE; return $ (o, a)}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
      <|>     do{ d <- op "..."; i <- idn; t <- optionMaybe (do{ o <- op ":"; t <- datatype; return (o, t)}); storeVar i AsTypeRest; return $ RestArg d i t }
 
-{-
-defval = do{ x <- manyTill defval' (try (lookAhead (op ",")) <|> lookAhead(op ")")); return x }
-
-defval' = try( do{ x <- kw "null"; return x})
-      <|> try( do{ x <- kw "true"; return x})
-      <|> try( do{ x <- kw "false"; return x})
-      <|> try( do{ x <- ident; return x})
-      <|> try( do{ x <- str; return x})
-      <|> do{ x <- num; return x}
--}
-
-varS = try(do{ ns <- optionMaybe(varAttributes)
+varS = try(do{ ns <- varAttributes
              ; k <- choice[kw "var", kw "const"]
              ; v <- varBinding
              ; vs <- many (do{ s <- op ","; v <- varBinding; return (s, v)})
