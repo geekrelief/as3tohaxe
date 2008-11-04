@@ -114,13 +114,16 @@ interfaceBlock (Block l bs r)  = do
     bi <-  foldlM (\s b -> do{ x <- interfaceBlockItem b; return $ s ++ x} ) "" bs 
     return $ showb l ++ bi ++ showb r
 
+blockItemFold bs = foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
 
 block (Block l bs r)  = do 
-    bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
+--    bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
+    bi <- blockItemFold bs
     return $ showb l ++ bi ++ showb r
 
 constructorBlock (Block l bs r) = do 
-    bi <-  foldrM (\b s -> do{ x <- blockItem b; return $ x ++ s} ) "" bs 
+    --bi <-  foldrM (\b s -> do{ x <- blockItem b; return $ x ++ s} ) "" bs 
+    bi <-  blockItemFold bs
     let spacebreak = break (\c -> c == '\n') ( reverse $ showw l)
     let i =  reverse $ fst spacebreak
     let nl = if length (snd spacebreak) > 1 && (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
@@ -238,7 +241,8 @@ methodDecl (MethodDecl a f ac n s b) = do
                   Nothing -> do{ s' <- signature s; return $ showb name ++ s'}
           accblock arg ac (Block l bs r) = 
               do let ts = case ac of { Just x -> if showd x == "set" then "\treturn "++arg++";"++ init(showw l) else ""; Nothing -> ""}
-                 bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs
+                 --bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs
+                 bi <-  blockItemFold bs
                  return $ showb l ++ bi ++ ts ++ showb r
           getArg (Signature l (a@(Arg n c t md mc):as) r ret) = showd n
           getArg (Signature l [] r ret) = ""
@@ -511,7 +515,7 @@ forS (ForS k l finit s e s1 e1 r b) =
                        rop = findROperand e
                    bound <- maybe (return "") (\r -> do{ r' <- aritE r; return r' }) rop
                    fblock <- block b
--- convert to iterator ?? are iterators slower?
+-- convert to iterator
                    return $ showb k ++ showb l ++ maybeEl showd var ++ " in " ++ maybeEl id start ++ "..." ++ bound ++ showb r ++ fblock
            else do fheader <- maybe (return "") cforInit finit
                    ftest <-  maybe (return "") listE e
@@ -523,8 +527,9 @@ forS (ForS k l finit s e s1 e1 r b) =
     where cforInit i = do case i of
                              FIListE l -> listE l >>= return
                              FIVarS v  -> varS v >>= return
-          cforBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
-                                           ; return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r }
+          --cforBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
+          cforBlock (Block l bs r) tail = do bi <-  blockItemFold bs
+                                             return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r
           wsBlock (Block l bs r) = return $ showw l
 
 isIterator fi e e1 = hasInteger fi && hasLessThan e && hasPlusPlus e1
