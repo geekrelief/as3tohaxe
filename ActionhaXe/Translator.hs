@@ -323,7 +323,6 @@ namespace ns = concat $ map (\attr -> (case showd attr of { "dynamic" -> ""
                                                           ; "final" -> ""
                                                           ; "protected" -> ""
                                                           ; "internal" -> "private" ++ showw attr
-                                                          ; "public" -> ""
                                                           ; _ -> showb attr 
                                                           }
                                       ) ) ns
