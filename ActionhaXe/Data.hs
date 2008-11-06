@@ -181,6 +181,7 @@ data BlockItem =  Tok        CToken
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarS       [CToken] CToken VarBinding [(CToken, VarBinding)] -- maybe attributes, var, varbinding, [(',', varbinding)]
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}
+                | ForInS     CToken (Maybe CToken) CToken ForInBinding CToken ListE CToken BlockItem -- for, maybe each, ( forinbinding in listE ) {}
                 | Metadata   Metadata
     deriving (Show, Data, Typeable)
 
@@ -190,6 +191,10 @@ data Metadata = MDSwf [(CToken, CToken)]
 
 data ForInit = FIListE ListE
              | FIVarS  BlockItem
+    deriving (Show, Data, Typeable)
+
+data ForInBinding = FIBPostE PostFixE
+                  | FIBVar CToken VarBinding  -- var | const , varbinding
     deriving (Show, Data, Typeable)
 
 data VarBinding = VarBinding   CToken (Maybe (CToken, AsType)) (Maybe (CToken, AssignE)) --varbinding with Type-- identifier, (maybe (:, datatype)), (maybe (=, assignE)), maybe ','

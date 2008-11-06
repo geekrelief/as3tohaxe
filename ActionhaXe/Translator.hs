@@ -33,6 +33,7 @@ import Data.Foldable (foldlM, foldrM)
 import Data.List (intercalate)
 import Data.Char (toUpper, isAlphaNum)
 import Data.Generics -- not Haskell 98
+import Data.Maybe (isJust)
 
 import Text.Regex
 
@@ -166,6 +167,7 @@ blockItem b =
                 Block _ _ _                 -> block b >>= return
                 VarS _ _ _ _                -> varS b >>= return
                 ForS _ _ _ _ _ _ _ _ _      -> forS b >>= return
+                ForInS _ _ _ _ _ _ _ _      -> forInS b >>= return
                 Expr _                      -> expr b >>= return
                 Metadata m                  -> metadata m >>= return
                 _                           -> return ""
@@ -273,11 +275,11 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
 
 memberVarS (VarS ns k v vs) = do 
     if elem "static" (map (\n -> showd n) ns)
-        then do{ v' <- varBinding v False
-               ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s ++ showb c ++ x'}) "" vs
+        then do{ v' <- varBinding v
+               ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x; return $ s ++ showb c ++ x'}) "" vs
                ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) then "inline " else ""
                ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
-        else do{ v' <- varBinding v True; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x True; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
+        else do{ v' <- varBindingInitMember v; vs' <- foldlM (\s (c, x) -> do{ x' <- varBindingInitMember x; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 
 hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
 
@@ -287,10 +289,10 @@ hasPrimitive' (TokenKw "true") = True
 hasPrimitive' (TokenKw "false") = True
 hasPrimitive' _ = False
 
-varS (VarS ns k v vs) = do{ v' <- varBinding v False; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x False; return $ s++ showb c ++x' }) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
+varS (VarS ns k v vs) = do{ v' <- varBinding v; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x; return $ s++ showb c ++x' }) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 
-varBinding :: VarBinding -> Bool -> StateT AsState IO String
-varBinding (VarBinding n dt i) initMember = 
+
+varBinding' (VarBinding n dt i) =
     do{ d' <- case dt of
                   Just (c, t) -> do{ d <- datatypeiM t i; return $ showb c ++ d}
                   Nothing -> case i of -- try to determine type from initializer
@@ -300,11 +302,21 @@ varBinding (VarBinding n dt i) initMember =
                                                        Nothing -> return $ ":Dynamic" ++ showw n -- can't determine type
                                  Nothing -> return $ ":Dynamic" ++ showw n -- no datatype, no initializer
       ; i' <- maybe (return "") (\(o, e) -> do{ e' <- assignE e; return $ showb o ++ e'}) i; 
-      ; if i' /= "" && initMember
-            then do{ insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"
-                   ; return $ showd n ++ d' }
-            else return $ showd n ++ d' ++ i'
+      ; return (d', i')
       }
+ 
+--varBinding :: VarBinding -> StateT AsState IO String
+varBinding (VarBinding n dt i) = 
+    do (d', i') <- varBinding' (VarBinding n dt i)
+       return $ showd n ++ d' ++ i'
+
+varBindingInitMember (VarBinding n dt i) = 
+    do (d', i') <- varBinding' (VarBinding n dt i)
+       if i' /= ""
+           then do insertInitMember $ showb n ++ (if last(showb n) == ' ' then "" else " ") ++ i' ++ ";"
+                   return $ showd n ++ d' 
+           else return $ showd n ++ d' ++ i'
+      
 
 
 
@@ -319,10 +331,11 @@ getTypeTokenType (TokenKw "true") = Just "Bool"
 getTypeTokenType (TokenKw "false") = Just "Bool"
 getTypeTokenType _ = Nothing
 
-namespace ns = concat $ map (\attr -> (case showd attr of { "dynamic" -> ""
+namespace ns = concat $ map (\attr -> (case showd attr of { "private" -> "" -- all fields by default are private
+                                                          ; "protected" -> "" -- in haXe private  fields are accessible by subclasses
+                                                          ; "internal" -> ""
+                                                          ; "dynamic" -> ""
                                                           ; "final" -> ""
-                                                          ; "protected" -> ""
-                                                          ; "internal" -> "private" ++ showw attr
                                                           ; _ -> showb attr 
                                                           }
                                       ) ) ns
@@ -561,3 +574,18 @@ findI _ = Nothing
 findROperand = everything orElse (Nothing `mkQ` findROp)
 findROp (AEBinary op l r) = Just r
 findROp _ = Nothing
+
+forInS (ForInS  k me l fb i e r b) = 
+    do if isJust me -- for each in?
+           then do fb' <- eachBinding fb
+                   e' <- listE e
+                   b' <- block b
+                   return $ showb k ++ showb l ++ fb' ++ showb i ++ e' ++ showb r ++ b'
+           else do fb' <- elseBinding fb
+                   e' <- listE e
+                   b' <- block b
+                   return $ showb k ++ showb l ++ fb' ++ showb i ++ e' ++ showb r ++ b'
+    where eachBinding (FIBVar _ (VarBinding i _ _)) = return $ showd i ++ " "
+          eachBinding (FIBPostE p) = do{ p' <- postFixE p; return $ p'}
+          elseBinding (FIBVar v b) = do{ b' <- varBinding b; return $ showb v ++ b'}
+          elseBinding (FIBPostE p) = do{ p' <- postFixE p; return $ p'}

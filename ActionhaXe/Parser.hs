@@ -331,17 +331,30 @@ expr = do{ x <- assignE; return $ Expr x}
 exprNoIn = do{ x <- assignENoIn; return $ Expr x}
 
 statement = try(do{ x <- varS; return x})
-        <|> do{ x <- forS; return x}
+        <|> try(do{ x <- forS; return x})
+        <|>     do{ x <- forInS; return x}
 
-forS = do{ k <- kw "for"
-         ; l <- op "("
-         ; init <- optionMaybe forInit
-         ; s <- op ";"
-         ; e <- optionMaybe listE
-         ; s1 <- op ";"
-         ; e1 <- optionMaybe listE
-         ; r <- op ")"
-         ; b <- block
-         ; return $ ForS k l init s e s1 e1 r b  }
+forS = do k <- kw "for"
+          l <- op "("
+          init <- optionMaybe forInit
+          s <- op ";"
+          e <- optionMaybe listE
+          s1 <- op ";"
+          e1 <- optionMaybe listE
+          r <- op ")"
+          b <- block
+          return $ ForS k l init s e s1 e1 r b
     where forInit = try(do{ l <- listENoIn; return $ FIListE l})
                 <|>     do{ x <- varS; return $ FIVarS x}
+
+forInS = do k <- kw "for"
+            me <- optionMaybe (kw "each")
+            l <- op "("
+            fb <- fbind
+            i <- kw "in"
+            e <- listE
+            r <- op ")"
+            b <- block
+            return $ ForInS k me l fb i e r b
+    where fbind = try(do{ p <- postFixE; return $ FIBPostE p})
+              <|>     do{ v <- choice [kw "var", kw "const"]; b <- varBinding; return $ FIBVar v b}
