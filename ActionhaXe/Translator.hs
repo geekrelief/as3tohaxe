@@ -203,7 +203,7 @@ classDecl (ClassDecl a c n e i b) = do
     let i' = maybe [] (\(ic, cs) -> map (\(x, co) -> showb ic ++ showd x) cs ) i
     let i'' = i' ++ if "dynamic" `elem` map (\a' -> showd a') a then ["implements Dynamic<Dynamic>"] else [""]
     let ei = intercalate ", " $ filter (\x -> length x > 0) $ e'++i''
-    return $ namespace a ++ showb c ++ showb n ++ ei ++ " " ++ x 
+    return $ showb c ++ showb n ++ ei ++ " " ++ x 
     where publicAttr as = if "public" `elem` map (\a -> showd a) as then "public" else "private"
 
 interface (Interface a i n e b) = do
@@ -474,7 +474,9 @@ queryOp x = case x of
                 QueryOpD o l e r -> do{ e' <- listE e; return $ showb o ++ showb l ++ e' ++ showb r}
 
 unaryE x = case x of
-               UEDelete k p   -> do{ p' <- postFixE p; return $ showb k ++ p'}
+               UEDelete k p   -> do if checkDelete p
+                                         then deleteField p >>= return
+                                         else do{ p' <- postFixE p ; return $ showb k ++ p'}
                UEVoid k p     -> do{ p' <- postFixE p; return $ showb k ++ p'}
                UETypeof k p   -> do{ p' <- postFixE p; return $ showb k ++ p'}
                UEInc o p      -> do{ p' <- postFixE p; return $ showb o ++ p'}
@@ -484,6 +486,11 @@ unaryE x = case x of
                UEBitNot o p   -> do{ p' <- unaryE p; return $ showb o ++ p'}
                UENot o p      -> do{ p' <- unaryE p; return $ showb o ++ p'}
                UEPrimary p    -> postFixE p >>= return
+    where checkDelete (PFFull (FPFPrimary (PEIdent i) [(FPSProperty (PropertyB _ _ _ ))]) _) = True
+          checkDelete _ = False
+          deleteField (PFFull (FPFPrimary (PEIdent i) [(FPSProperty (PropertyB l e r ))]) _) = 
+              do e' <- listE e
+                 return $ "Reflect.deleteField("++showd i++", "++e'++")"
 
 aritE x = case x of
               AEUnary u  -> unaryE u >>= return
