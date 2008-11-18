@@ -177,7 +177,7 @@ data BlockItem =  Tok        CToken
                 | Block      CToken [BlockItem] CToken
                 | ImportDecl CToken CToken Semi  -- import identifier ;
                 | ClassDecl  [CToken] CToken CToken (Maybe (CToken, CToken)) (Maybe (CToken, [(CToken, Maybe CToken)])) BlockItem -- attributes, class, identifier, maybe (extends, idn), maybe (implements [(idn, maybe',')]), body
-                | Interface  [CToken] CToken CToken (Maybe (CToken, CToken)) BlockItem -- public | internal, interface, identifier, maybe extends, body
+                | Interface  [CToken] CToken CToken (Maybe (CToken, [(CToken, Maybe CToken)])) BlockItem -- public | internal, interface, identifier, maybe (extends [(idn, maybe ',')], body
                 | MethodDecl [CToken] CToken (Maybe CToken) CToken Signature (Maybe BlockItem) -- attributes, function, maybe get/set, identifier, Signature, body
                 | VarS       [CToken] CToken VarBinding [(CToken, VarBinding)] -- maybe attributes, var, varbinding, [(',', varbinding)]
                 | ForS       CToken CToken (Maybe ForInit) CToken (Maybe ListE) CToken (Maybe ListE) CToken BlockItem -- for( ? ; ? ; ?) {}

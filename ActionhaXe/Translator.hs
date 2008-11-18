@@ -208,8 +208,10 @@ classDecl (ClassDecl a c n e i b) = do
 
 interface (Interface a i n e b) = do
     x <- interfaceBlock b
-    let e' = maybe "" (\(e, c) -> "implements "++showd c ) e
-    return $ showb i ++ showb n ++ e' ++ x
+--    let e' = maybe "" (\(e, c) -> "implements "++showd c ) e
+    let e' = maybe [] (\(ic, cs) -> map (\(x, co) -> "implements " ++ showd x) cs ) e
+    let i' = intercalate ", " e'
+    return $ showb i ++ showb n ++ i' ++ x
 
 methodDecl (MethodDecl a f ac n s b) = do 
     packageName <- getFlag fpackage

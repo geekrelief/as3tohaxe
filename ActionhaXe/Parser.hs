@@ -125,9 +125,10 @@ metadataSwf =
 
 importDecl = do{ k <- kw "import"; s <- sident; o <- maybeSemi; return $ ImportDecl k s o}
 
-interface = do{ a <- classAttributes; k <- kw "interface"; i <- ident; e <- optionMaybe(classExtends); b <- classBlock; return $ Interface a k i e b}
+interface = do{ a <- classAttributes; k <- kw "interface"; i <- ident; e <- optionMaybe(interfaceExtends); b <- classBlock; return $ Interface a k i e b}
 
--- need to fix classImplements to return a tuple
+interfaceExtends = do{ k <- kw "extends"; s <- many1 (do{n <- nident; c <- optionMaybe (op ","); return (n,c)}); return $ (k,s) } 
+
 classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); storeClass i; b <- classBlock; return $ ClassDecl a k i e im b}
 
 classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "internal"))) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "dynamic")
@@ -135,7 +136,6 @@ classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "in
 
 classExtends = do{ k <- kw "extends"; s <- nident; return $ (k, s)}
 
--- need to fix this so it returns a tuple to classDecl
 classImplements = do{ k <- kw "implements"; s <- many1 (do{n <- nident; c <- optionMaybe (op ","); return (n,c)}); return $ (k,s) } 
 
 methodDecl = try(do{ attr <- methodAttributes
