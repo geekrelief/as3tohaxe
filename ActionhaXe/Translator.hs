@@ -110,7 +110,7 @@ classBlock (Block l bs r)  = do
                      ) "" al
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
     nc <- checkConstructor l
-    return $ showd l ++ props ++ showw l ++ nc ++ showw l ++ bi ++ showb r
+    return $ showd l ++ nc ++ props ++ showw l ++ bi ++ showb r
 
 checkConstructor l = do
     con <- getFlag hasConstructor
@@ -118,7 +118,7 @@ checkConstructor l = do
     if con == "" && length x > 0
         then do let (nl, i) = getNI l
                 initM <- getInitMembers l
-                return $ "public function new() {" ++ initM ++ "}"++ nl ++ i
+                return $ "public function new() {" ++ initM ++ "}"++ nl ++ i ++ showw l
         else return ""
 
 interfaceBlock (Block l bs r)  = do 
