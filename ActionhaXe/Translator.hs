@@ -209,7 +209,7 @@ classDecl (ClassDecl a c n e i b) = do
 interface (Interface a i n e b) = do
     x <- interfaceBlock b
     let e' = maybe "" (\(e, c) -> "implements "++showd c ) e
-    return $ namespace a ++ showb i ++ showb n ++ e' ++ x
+    return $ showb i ++ showb n ++ e' ++ x
 
 methodDecl (MethodDecl a f ac n s b) = do 
     packageName <- getFlag fpackage
