@@ -31,7 +31,7 @@ import qualified Data.Map as Map
 import Control.Monad.State
 import Data.Foldable (foldlM, foldrM)
 import Data.List (intercalate)
-import Data.Char (toUpper, isAlphaNum)
+import Data.Char (toUpper, isUpper, isAlphaNum)
 import Data.Generics -- not Haskell 98
 import Data.Maybe (isJust)
 
@@ -292,11 +292,11 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
                                        }
           showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
-memberVarS (VarS ns k v vs) = do 
+memberVarS (VarS ns k v@(VarBinding n _ _) vs) = do 
     if elem "static" (map (\n -> showd n) ns)
         then do{ v' <- varBinding v
                ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x; return $ s ++ showb c ++ x'}) "" vs
-               ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) then "inline " else ""
+               ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) && foldr (\x s -> isUpper x && s ) True (showd n) then "inline " else ""
                ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
         else do{ v' <- varBindingInitMember v; vs' <- foldlM (\s (c, x) -> do{ x' <- varBindingInitMember x; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 
