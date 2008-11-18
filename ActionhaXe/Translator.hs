@@ -42,6 +42,7 @@ mainPackage = "mainPackage"
 fpackage  = "packageName"
 fclass = "className"
 fclassAttr = "classAttr"
+hasConstructor = "hasConstructor"
 
 updateFlag flag val = do st <- get
                          put st{flags = Map.insert flag val (flags st)}
@@ -63,7 +64,6 @@ insertInitMember output = do st <- get
 
 getMembers = do st <- get
                 let ret = reverse $ initMembers st
-                put st{initMembers = []}
                 return ret
 
 getCLArg f = do st <- get
@@ -109,7 +109,17 @@ classBlock (Block l bs r)  = do
                                               }
                      ) "" al
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
-    return $ showd l ++ props ++ showw l ++ bi ++ showb r
+    nc <- checkConstructor l
+    return $ showd l ++ props ++ showw l ++ nc ++ showw l ++ bi ++ showb r
+
+checkConstructor l = do
+    con <- getFlag hasConstructor
+    x <- getMembers
+    if con == "" && length x > 0
+        then do let (nl, i) = getNI l
+                initM <- getInitMembers l
+                return $ "public function new() {" ++ initM ++ "}"++ nl ++ i
+        else return ""
 
 interfaceBlock (Block l bs r)  = do 
     bi <-  foldlM (\s b -> do{ x <- interfaceBlockItem b; return $ s ++ x} ) "" bs 
@@ -118,21 +128,27 @@ interfaceBlock (Block l bs r)  = do
 blockItemFold bs = foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
 
 block (Block l bs r)  = do 
---    bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
     bi <- blockItemFold bs
     return $ showb l ++ bi ++ showb r
 
 constructorBlock (Block l bs r) = do 
-    --bi <-  foldrM (\b s -> do{ x <- blockItem b; return $ x ++ s} ) "" bs 
     bi <-  blockItemFold bs
+    initM <- getInitMembers l 
+    return $ showb l ++ initM ++ bi ++ showb r
+
+getNI l = 
     let spacebreak = break (\c -> c == '\n') ( reverse $ showw l)
-    let i =  reverse $ fst spacebreak
-    let nl = if length (snd spacebreak) > 1 && (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
-    x <- getMembers
-    let init = if length x > 0
-                   then nl++i++ intercalate (nl++i) x ++ nl ++ i
-                   else ""
-    return $ showb l ++ init ++ bi ++ showb r
+        i =  reverse $ fst spacebreak
+        nl = if length (snd spacebreak) > 1 && (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
+    in (nl, i)
+ 
+getInitMembers l = 
+    do let (nl, i) = getNI l
+       x <- getMembers
+       if length x > 0
+           then return $ nl++i++ intercalate (nl++i) x ++ nl ++ i
+           else return $ ""
+
 
 packageBlockItem b = 
     do x <- case b of
@@ -208,7 +224,6 @@ classDecl (ClassDecl a c n e i b) = do
 
 interface (Interface a i n e b) = do
     x <- interfaceBlock b
---    let e' = maybe "" (\(e, c) -> "implements "++showd c ) e
     let e' = maybe [] (\(ic, cs) -> map (\(x, co) -> "implements " ++ showd x) cs ) e
     let i' = intercalate ", " e'
     return $ showb i ++ showb n ++ i' ++ x
@@ -220,7 +235,7 @@ methodDecl (MethodDecl a f ac n s b) = do
     if packageName == mainPackage && className == (showd n) && classAttr == "public"
         then do{ x <- maybe (return "") block b; return $ "static " ++ showb f ++ "main() "++ x }
         else if className == (showd n)
-                 then do{ x <- maybe (return "") constructorBlock b; s' <- signatureArgs s; return $ namespace a ++ showb f ++ "new"++showw n ++ s' ++ x }
+                 then do{ updateFlag hasConstructor "true"; x <- maybe (return "") constructorBlock b; s' <- signatureArgs s; return $ namespace a ++ showb f ++ "new"++showw n ++ s' ++ x }
                  else do st <- get
                          let accMap = accessors st
                          if Map.member (showd n) accMap
@@ -241,10 +256,12 @@ methodDecl (MethodDecl a f ac n s b) = do
                               }
                   Nothing -> do{ s' <- signature s; return $ showb name ++ s'}
           accblock arg ac (Block l bs r) = 
-              do let ts = case ac of { Just x -> if showd x == "set" then "\treturn "++arg++";"++ init(showw l) else ""; Nothing -> ""}
-                 --bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs
+              do let ts = case ac of { Just x -> if showd x == "set" then "\treturn "++arg++";"++ initl l else ""; Nothing -> ""}
                  bi <-  blockItemFold bs
                  return $ showb l ++ bi ++ ts ++ showb r
+          initl l = if length (showw l) > 0
+                        then init $ showw l
+                        else ""
           getArg (Signature l (a@(Arg n c t md mc):as) r ret) = showd n
           getArg (Signature l [] r ret) = ""
 
@@ -549,7 +566,6 @@ forS (ForS k l finit s e s1 e1 r b) =
     where cforInit i = do case i of
                              FIListE l -> listE l >>= return
                              FIVarS v  -> varS v >>= return
-          --cforBlock (Block l bs r) tail = do{ bi <-  foldlM (\s b -> do{ x <- blockItem b; return $ s ++ x} ) "" bs 
           cforBlock (Block l bs r) tail = do bi <-  blockItemFold bs
                                              return $ showb l ++ bi ++ "\t" ++ tail ++ ";" ++ init (showw l) ++ showb r
           wsBlock (Block l bs r) = return $ showw l
