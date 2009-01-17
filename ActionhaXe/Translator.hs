@@ -52,10 +52,14 @@ deleteFlag flag = do st <- get
 
 getFlag :: String -> StateT AsState IO String
 getFlag flag = do st <- get
-                  if Map.member flag $ flags st
+                  case Map.lookup flag $ flags st of
+                      Just mval -> return mval
+                      Nothing   -> return ""
+{-                  if Map.member flag $ flags st
                       then do mval <- Map.lookup flag $ flags st
                               return mval
                       else return ""
+-}
 
 insertInitMember output = do st <- get
                              put st{initMembers = (output:(initMembers st))}
@@ -110,15 +114,15 @@ classBlock (Block l bs r)  = do
                      ) "" al
     bi <-  foldlM (\s b -> do{ x <- classBlockItem b; return $ s ++ x} ) "" bs 
     nc <- checkConstructor l
-    return $ showd l ++ nc ++ props ++ showw l ++ bi ++ showb r
+    return $ showd l ++ showw l ++ nc ++ props ++ showw l ++ bi ++ showb r
 
 checkConstructor l = do
     con <- getFlag hasConstructor
     x <- getMembers
-    if con == "" && length x > 0
-        then do let (nl, i) = getNI l
+    if con == "" 
+        then do let (nl, i) = getNlIndent l
                 initM <- getInitMembers l
-                return $ "public function new() {" ++ initM ++ "}"++ nl ++ i ++ showw l
+                return $ "public function new() { " ++ initM ++ "}"++ nl ++ i
         else return ""
 
 interfaceBlock (Block l bs r)  = do 
@@ -136,14 +140,14 @@ constructorBlock (Block l bs r) = do
     initM <- getInitMembers l 
     return $ showb l ++ initM ++ bi ++ showb r
 
-getNI l = 
+getNlIndent l = 
     let spacebreak = break (\c -> c == '\n') ( reverse $ showw l)
         i =  reverse $ fst spacebreak
         nl = if length (snd spacebreak) > 1 && (snd spacebreak)!!1 == '\r' then "\r\n" else "\n"
     in (nl, i)
  
 getInitMembers l = 
-    do let (nl, i) = getNI l
+    do let (nl, i) = getNlIndent l
        x <- getMembers
        if length x > 0
            then return $ nl++i++ intercalate (nl++i) x ++ nl ++ i
@@ -238,15 +242,14 @@ methodDecl (MethodDecl a f ac n s b) = do
                  then do{ updateFlag hasConstructor "true"; x <- maybe (return "") constructorBlock b; s' <- signatureArgs s; return $ namespace a ++ showb f ++ "new"++showw n ++ s' ++ x }
                  else do st <- get
                          let accMap = accessors st
-                         if Map.member (showd n) accMap
-                              then do (t, _, _) <- Map.lookup (showd n) accMap
-                                      let arg = getArg s
-                                      x <- maybe (return "" ) (accblock arg ac) b
-                                      acc' <- accessor ac n s t
-                                      return $ namespace a ++ showb f ++ acc' ++ x 
-                              else do x <- maybe (return "") block b
-                                      s' <- signature s
-                                      return $ namespace a ++ showb f ++ showb n ++ s' ++ x
+                         case Map.lookup (showd n) accMap of
+                             Just (t, _, _) -> do let arg = getArg s
+                                                  x <- maybe (return "" ) (accblock arg ac) b
+                                                  acc' <- accessor ac n s t
+                                                  return $ namespace a ++ showb f ++ acc' ++ x 
+                             Nothing        -> do x <- maybe (return "") block b
+                                                  s' <- signature s
+                                                  return $ namespace a ++ showb f ++ showb n ++ s' ++ x
     where accessor ac name s@(Signature l args r ret) t = 
               case ac of
                   Just x -> do{ a <- showArgs args

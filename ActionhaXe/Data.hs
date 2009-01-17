@@ -257,13 +257,12 @@ getProperty name =
     do x <- getState
        let a = accessors x
        let def = (AsTypeUnknown, False, False)
-       if (Map.notMember name a) 
-           then do{ let a' = Map.insert name def a
-                  ; let x' = x{ accessors = a' } 
-                  ; setState x'
-                  ; return def
-                  }
-           else Map.lookup name a >>= return
+       case Map.lookup name a of
+           Nothing   -> do let a' = Map.insert name def a
+                           let x' = x{ accessors = a' } 
+                           setState x'
+                           return def
+           Just prop -> return prop
 
 setProperty name prop =
     do x <- getState

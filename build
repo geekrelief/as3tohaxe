@@ -1,0 +1,1 @@
+ghc --make -XDeriveDataTypeable as3tohaxe.hs

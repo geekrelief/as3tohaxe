@@ -26,6 +26,7 @@ Requirements
 - parsec 3 http://hackage.haskell.org/cgi-bin/hackage-scripts/package/parsec
 
 Compile with: ghc --make -XDeriveDataTypeable as3tohaxe.hs
+or the './build' script
 
 -- License --
 This program and its source is GPL licensed.  Please read the LICENSE
