@@ -39,7 +39,10 @@ translateFile filename = do
     let outdir = confOutput conf
     liftIO $ putStrLn $ "Translating " ++ filename
     contents <- liftIO $ readFile filename
-    let tokens = runLexer "" contents
+    let updated_contents = if gotArg (confArgs conf) NoCarriage
+                               then filter ( /= '\r' ) contents -- remove carriage
+                               else contents
+    let tokens = runLexer "" updated_contents
     let outfilename = outdir ++ (reverse $ "xh" ++ ( drop 2 $ reverse filename))
     program <- case parseTokens filename tokens of
         Right p@(AS3Program x st) -> return (p, st{outfile = outfilename, conf=conf })

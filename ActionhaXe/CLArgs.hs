@@ -21,6 +21,7 @@ import System.Console.ParseArgs
 import Data.Generics
 
 data CLArg = NumberToInt
+           | NoCarriage
            | Input
            | OutputDir
     deriving (Eq, Ord, Show, Data, Typeable)
@@ -34,5 +35,6 @@ initArg f desc = Arg{ argIndex = f, argAbbr = Nothing, argName = Nothing, argDat
 clargs = 
   [
     (initArg NumberToInt "translate :Number to :Int (default :Float)"){ argAbbr = Just 'i', argName = Just "intnum" }
+  , (initArg NoCarriage "remove carriage returns '\\r' in output"){ argAbbr = Just 'r', argName = Just "nocarriage" }
   , (initArg Input "input to convert") { argData = argDataRequired "directory | file" ArgtypeString }
   ]
