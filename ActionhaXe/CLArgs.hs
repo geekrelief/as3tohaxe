@@ -22,6 +22,7 @@ import Data.Generics
 
 data CLArg = NumberToInt
            | NoCarriage
+           | CreateImports
            | Input
            | OutputDir
     deriving (Eq, Ord, Show, Data, Typeable)
@@ -36,5 +37,6 @@ clargs =
   [
     (initArg NumberToInt "translate :Number to :Int (default :Float)"){ argAbbr = Just 'i', argName = Just "intnum" }
   , (initArg NoCarriage "remove carriage returns '\\r' in output"){ argAbbr = Just 'r', argName = Just "nocarriage" }
+  , (initArg CreateImports "creates \"Import\" files in place of * imports (e.g. import a.*;)"){ argName = Just "imports" }
   , (initArg Input "input to convert") { argData = argDataRequired "directory | file" ArgtypeString }
   ]
