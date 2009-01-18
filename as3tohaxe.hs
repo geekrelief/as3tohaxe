@@ -29,10 +29,10 @@ import System.Environment (getArgs)
 import Control.Monad.State
 import System.Exit
 import Data.Char (toUpper, toLower)
-import Data.List (isSuffixOf)
+import Data.List (isSuffixOf, intercalate)
 import System.Console.ParseArgs
 import Data.Maybe (fromJust, fromMaybe)
-import System.FilePath.Posix (takeDirectory)
+import System.FilePath.Posix (takeDirectory, takeBaseName, splitDirectories)
 import qualified Data.Map as Map
 
 translateFile :: String -> StateT Conf IO ()
@@ -40,8 +40,13 @@ translateFile filename = do
     conf <- get
     let outdir = confOutput conf
     let dir = takeDirectory filename
-    dirExists <- liftIO $ doesDirectoryExist (outdir ++ dir) 
+    dirExists <- liftIO $ doesDirectoryExist (outdir ++ dir) -- check if dir exists
+    -- create dir
     liftIO $ unless dirExists (createDirectoryIfMissing True (outdir++dir) >> putStrLn ("Created " ++ outdir++dir))
+    -- add path to imports
+    unless dirExists (put conf{ imports = (Map.insert dir [] $ imports conf) })
+    -- add class to imports
+    put conf{imports = (Map.insertWith (\x y -> x ++ y) dir [takeBaseName $ (toUpper $ head filename):(tail filename)] $ imports conf) }
     liftIO $ putStrLn $ "Translating " ++ filename
     contents <- liftIO $ readFile filename
     let updated_contents = if gotArg (confArgs conf) NoCarriage
@@ -84,9 +89,18 @@ main = do args <- parseArgsIO ArgsTrailing clargs
           let input = fromJust $ getArgString args Input 
           let outdir = fromMaybe "hx_output/" $ getArgString args OutputDir 
           let conf = Conf{ confArgs = args , confInput = input, confOutput = outdir, imports = Map.empty}
-          if isSuffixOf ".as" input
-              then do
-                      dirExists <- doesDirectoryExist outdir
-                      unless dirExists ((createDirectoryIfMissing True outdir) >> putStrLn ("Created " ++ outdir))
-                      runStateT (translateFile input) conf
-              else runStateT (translateDir input) conf
+          (_, updated_conf) <- if isSuffixOf ".as" input
+                              then do dirExists <- doesDirectoryExist outdir
+                                      unless dirExists ((createDirectoryIfMissing True outdir) >> putStrLn ("Created " ++ outdir))
+                                      runStateT (translateFile input) conf
+                              else runStateT (translateDir input) conf
+          if gotArg (confArgs updated_conf) CreateImports
+              then do putStrLn $ "Creating import files in "++outdir
+                      mapM_ (\(k, v)-> createImport outdir k $ reverse v) $ Map.toList $ imports updated_conf
+              else return () 
+
+createImport outdir packagePath packageList = do let importFileName = intercalate "_" ("Import":(splitDirectories packagePath))
+                                                 writeFile (outdir ++ importFileName++".hx") $ packageContent packagePath packageList
+    where packageContent path list = foldl (\content klass -> content++ "typedef "++klass++" = "++ppath++klass++"\n") "" list
+                                         where ppath = (intercalate "." $ splitDirectories path)++"."
+                                         
