@@ -32,11 +32,16 @@ import Data.Char (toUpper, toLower)
 import Data.List (isSuffixOf)
 import System.Console.ParseArgs
 import Data.Maybe (fromJust, fromMaybe)
+import System.FilePath.Posix (takeDirectory)
+import qualified Data.Map as Map
 
 translateFile :: String -> StateT Conf IO ()
 translateFile filename = do
     conf <- get
     let outdir = confOutput conf
+    let dir = takeDirectory filename
+    dirExists <- liftIO $ doesDirectoryExist (outdir ++ dir) 
+    liftIO $ unless dirExists (createDirectoryIfMissing True (outdir++dir) >> putStrLn ("Created " ++ outdir++dir))
     liftIO $ putStrLn $ "Translating " ++ filename
     contents <- liftIO $ readFile filename
     let updated_contents = if gotArg (confArgs conf) NoCarriage
@@ -69,8 +74,6 @@ translateDir dir = do
     conf <- get
     let outdir = confOutput conf
     contents <- liftIO $ getDirectoryContents dir
-    dirExists <- liftIO $ doesDirectoryExist (outdir ++ dir) 
-    liftIO $ unless dirExists (createDirectoryIfMissing True (outdir++dir) >> putStrLn ("Created " ++ outdir++dir))
     let c = map (\e -> dir++"/"++e) (filter (\d-> d /= "." && d /=".." && d /= ".svn") contents)
     asfiles <- filterM isFile c
     asdirs <- filterM isDir c
@@ -80,7 +83,7 @@ translateDir dir = do
 main = do args <- parseArgsIO ArgsTrailing clargs
           let input = fromJust $ getArgString args Input 
           let outdir = fromMaybe "hx_output/" $ getArgString args OutputDir 
-          let conf = Conf{ confArgs = args , confInput = input, confOutput = outdir}
+          let conf = Conf{ confArgs = args , confInput = input, confOutput = outdir, imports = Map.empty}
           if isSuffixOf ".as" input
               then do
                       dirExists <- doesDirectoryExist outdir

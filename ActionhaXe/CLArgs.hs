@@ -19,6 +19,7 @@ module ActionhaXe.CLArgs (CLArg(..), Conf(..), clargs) where
 
 import System.Console.ParseArgs
 import Data.Generics
+import Data.Map
 
 data CLArg = NumberToInt
            | NoCarriage
@@ -27,7 +28,7 @@ data CLArg = NumberToInt
            | OutputDir
     deriving (Eq, Ord, Show, Data, Typeable)
 
-data Conf = Conf{ confArgs::Args CLArg, confInput::String, confOutput::String }
+data Conf = Conf{ confArgs::Args CLArg, confInput::String, confOutput::String, imports::Map String [String] }
           | ConfNone
     deriving (Show, Data, Typeable)
 
