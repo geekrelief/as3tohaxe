@@ -54,6 +54,7 @@ shown x = tailAtN $ snd $ break (== '\n') $ foldr (\t s -> (tokenItemS t) ++ s) 
 showl :: [CToken] -> String
 showl xs = foldr (\t s -> showb t ++ s) "" xs
 
+-- splits the space from the left and right
 splitLR :: String -> [String]
 splitLR x = [l, m, r]
     where (l, nl) = span (\c -> isSpace c || c == '\n') x

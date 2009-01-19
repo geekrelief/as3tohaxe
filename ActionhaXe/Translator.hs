@@ -532,9 +532,11 @@ aritE x = case x of
 aritENoIn = aritE
 
 binaryE (AEBinary o x y)  
-	| showd o == "as" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "cast( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
-	| showd o == "is" = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "Std.is( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
-    | otherwise       = do{ x' <- aritE x; y' <- aritE y; return $ x' ++ showb o ++ y'}
+	| showd o == "as"  = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "cast( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
+	| showd o == "is"  = do{ x' <- aritE x >>= (\c -> return $ splitLR c); y' <- aritE y >>= (\c -> return $ splitLR c); return $ "Std.is( "++ (x'!!1) ++", "++ (y'!!1) ++")" ++ (y'!!2) }
+	| showd o == "==="  = do{ x' <- aritE x; y' <- aritE y; return $ x' ++"=="++showw o ++ y' }
+	| showd o == "!=="  = do{ x' <- aritE x; y' <- aritE y; return $ x' ++"!="++showw o ++ y' }
+    | otherwise        = do{ x' <- aritE x; y' <- aritE y; return $ x' ++ showb o ++ y'}
 
 
 regE (RegE l x r o) = do{ return $ "~"++ showb l ++ showl x ++ showb r ++ maybeEl showb o}
