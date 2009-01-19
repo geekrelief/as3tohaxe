@@ -155,8 +155,18 @@ methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (k
 signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( do{ o <- op ":"; r <- datatype; return (o, r)}); return $ Signature lp a rp ret} -- missing return type means constructor
 
 sigargs = do{ s <- many sigarg; return s}
-sigarg = try(do{ a <- idn; o <- op ":"; t <- datatype; d <- optionMaybe( do{ o <- op "="; a <- assignE; return $ (o, a)}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
-     <|>     do{ d <- op "..."; i <- idn; t <- optionMaybe (do{ o <- op ":"; t <- datatype; return (o, t)}); storeVar i AsTypeRest; return $ RestArg d i t }
+sigarg = try(do{ a <- idn; o <- op ":"; 
+                 try(do{ t <- datatype; d <- optionMaybe( do{ o <- op "="; a <- assignE; return $ (o, a)}); c <- optionMaybe(op ","); storeVar a t; return $ Arg a o t d c})
+             <|> try(do{ d <- op "*=" -- special case where no space between *= is parsed as an operator
+                       ; let (d', eq) = extractDynamicType d
+                       ; e <- assignE;
+                       ; c <- optionMaybe(op ",")
+                       ; let t = AsType d'
+                       ; storeVar a t;
+                       ; return $ Arg a o t (Just (eq, e)) c
+                       })
+             })
+     <|> do{ d <- op "..."; i <- idn; t <- optionMaybe (do{ o <- op ":"; t <- datatype; return (o, t)}); storeVar i AsTypeRest; return $ RestArg d i t }
 
 varS = try(do{ ns <- varAttributes
              ; k <- choice[kw "var", kw "const"]
@@ -169,12 +179,35 @@ varS = try(do{ ns <- varAttributes
 varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
 
+{-
+varBinding = try(do n <- idn
+                    t <- optionMaybe(do{c <- op ":"; dt <- datatype; return (c, dt)})
+                    i <- optionMaybe (do{ o <- op "="; e <- assignE; return $ (o, e)})
+                    return $ VarBinding n t i
+                )
+             <|> do n <- idn
+                    c <- op ":"
+                    dt <- op "*="
+                    let (dt', o) = extractDynamicType dt
+                    e <- assignE;
+                    return $ VarBinding n (Just (c, AsType dt')) (Just (o, e))
+-}
+
+extractDynamicType ([t], s) = (([dt], []), ([eq], s))
+    where sourceName = tokenSource t
+          sourceLine = tokenLine t
+          sourceCol  = tokenCol t
+          dt = (TPos sourceName sourceLine sourceCol, TokenOp "*")
+          eq = (TPos sourceName sourceLine (sourceCol+1), TokenOp "=")
+ 
+
 varBinding = try(do{ n <- idn
                    ; t <- optionMaybe(do{c <- op ":"; dt <- datatype; return (c, dt)})
                    ; i <- optionMaybe (do{ o <- op "="; e <- assignE; return $ (o, e)})
                    ; return $ VarBinding n t i
                    }
                 )
+
 
 datatype = try(do{ t <- kw "void";      return $ AsType t})
        <|> try(do{ t <- mid "int";      return $ AsType t})

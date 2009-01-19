@@ -59,7 +59,7 @@ splitLR x = [l, m, r]
     where (l, nl) = span (\c -> isSpace c || c == '\n') x
           (r') = span (\c -> isSpace c || c == '\n') $ reverse nl
           (m, r) = (reverse $ snd r', reverse $ fst r')
- 
+
 type Name = String
 type TList = [Token]
 type CToken = (TList, TList) -- compound token with a list for an entity, whitespace
