@@ -35,7 +35,8 @@ import Data.Char (toUpper, isUpper, isAlphaNum)
 import Data.Generics -- not Haskell 98
 import Data.Maybe (isJust)
 
-import Text.Regex
+-- subRegex, mkRegex used for text replacement
+import Text.Regex 
 
 -- flags
 mainPackage = "mainPackage"
@@ -86,7 +87,7 @@ translateAs3Ast p =
 directives ds = foldlM (\str i -> do{s <- directive i; return $ str++s}) "" ds
     where directive d = case d of
                             Tok t                       -> do{ t' <- tok t; return $ cleanup t'}
-                            ImportDecl _ _ _            -> return $ cleanup $ importDecl d
+                            ImportDecl _ _ _            -> do{ d' <- importDecl d; return $ cleanup $ d'}
                             Metadata m                  -> do{ m' <- metadata m; return $ cleanup m'}
                             MethodDecl _ _ _ _ _ _      -> do{ d' <- methodDecl d; return $ cleanup d'}
                             VarS _ _ _ _                -> do{ d' <- memberVarS d; return $ cleanup d'}
@@ -157,7 +158,7 @@ getInitMembers l =
 packageBlockItem b = 
     do x <- case b of
                 Tok t                       -> tok t >>= return
-                ImportDecl _ _ _            -> return $ importDecl b
+                ImportDecl _ _ _            -> importDecl b >>= return
                 ClassDecl _ _ _ _ _ _       -> classDecl b >>= return
                 Interface _ _ _ _ _         -> interface b >>= return
                 Metadata m                  -> metadata m >>= return
@@ -213,7 +214,14 @@ metadata m = case m of
                   "backgroundColor"  -> swfheader as [w, h, f, tail.init.tail $ showd v]
           swfheader [] header = return $ intercalate ":" header
 
-importDecl (ImportDecl i n s) = foldr (\t s -> showb t ++ s) "" [i,n] ++ maybeEl showb s  -- look up and adjust
+importDecl (ImportDecl i n s) = do
+    ci <- getCLArg CreateImports
+    let show_n = showd n
+    let n' = if ci && elem '*' show_n
+                 then (\(h, t) ->  init h ++ tail t) $ break (== '*') $ subRegex (mkRegex "\\.") ("Import_" ++ show_n) "_"
+                 else show_n
+    return $ showb i ++ n' ++ maybeEl showb s
+          
 
 classDecl (ClassDecl a c n e i b) = do
     updateFlag fclass $ showd n

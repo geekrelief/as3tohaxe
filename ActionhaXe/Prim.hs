@@ -100,7 +100,7 @@ sepByCI1 p sep = do{ x <- p
                  }
 
 sepEndByI1 :: AsParser [a] -> AsParser [a] -> AsParser [[a]]
-sepEndByI1 p sep = do{ x <- sepEndBy1 p sep
+sepEndByI1 p sep = do{ x <- sepByI1 p sep
                      ; s <- sep
                      ; return $ x++[s]
                      }
@@ -109,7 +109,8 @@ ident' = do{ n <- sepByI1 id' (op' "."); return (concat n)}
 -- ident : qualified identifier
 ident = mylexeme $ ident'
 -- sident : qualified identifier with possible * at end
-sident = mylexeme $ try( do{ n <- sepEndByI1 id' (op' "."); o <- op' "*"; return $ (concat n) ++ o}) <|> ident'
+sident = mylexeme $ try( do{ n <- id'; ns <- many(do{ d <- op' "."; n <- (id' <|> op' "*"); return $ d++n}); return $ n ++ concat ns}) <|> ident'
+--sident = mylexeme $ try( do{ n <- mid' "event"; p <- op' "."; o <- op' "*"; return $ n ++ p ++ o}) <|> ident'
 -- nident : identifier qualified with namespace
 nident = mylexeme $ do{ q<- try(do{ n'<- ident'; c <- op' "::"; return $ n'++c }) <|> return []; n <- ident'; return $ q++n } 
 
