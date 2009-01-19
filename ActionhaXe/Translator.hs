@@ -303,14 +303,16 @@ showArgs as = do{ as' <- mapM showArg as; return $ concat as'}
                                        }
           showArg (RestArg o n t) = do{ return $ showd n ++ ":Array<Dynamic>"}
 
-memberVarS (VarS ns k v@(VarBinding n _ _) vs) = do 
+memberVarS (VarS ns k v@(VarBinding n d _) vs) = do 
     if elem "static" (map (\n -> showd n) ns)
-        then do{ v' <- varBinding v
-               ; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x; return $ s ++ showb c ++ x'}) "" vs
-               ; let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) && foldr (\x s -> isUpper x && s ) True (showd n) then "inline " else ""
-               ; return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
+        then do v' <- varBinding v
+                vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x; return $ s ++ showb c ++ x'}) "" vs
+--                let inl = if hasPrimitive v && length vs == length (filter (\(c, v) -> hasPrimitive v) vs) && foldr (\x s -> isUpper x && s ) True (showd n) then "inline " else ""
+--                return $ inl ++ namespace ns ++ "var" ++ showw k ++ v' ++ vs'
+                return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'
         else do{ v' <- varBindingInitMember v; vs' <- foldlM (\s (c, x) -> do{ x' <- varBindingInitMember x; return $ s ++ showb c ++ x'}) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 
+{-
 hasPrimitive = everything (||) (False `mkQ` hasPrimitive')
 
 hasPrimitive' (TokenNum _) = True
@@ -318,6 +320,7 @@ hasPrimitive' (TokenString _) = True
 hasPrimitive' (TokenKw "true") = True
 hasPrimitive' (TokenKw "false") = True
 hasPrimitive' _ = False
+-}
 
 varS (VarS ns k v vs) = do{ v' <- varBinding v; vs' <- foldlM (\s (c, x) -> do{ x' <- varBinding x; return $ s++ showb c ++x' }) "" vs; return $ namespace ns ++ "var" ++ showw k ++ v' ++ vs'}
 

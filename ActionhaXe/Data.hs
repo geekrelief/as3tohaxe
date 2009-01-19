@@ -197,7 +197,7 @@ data ForInBinding = FIBPostE PostFixE
                   | FIBVar CToken VarBinding  -- var | const , varbinding
     deriving (Show, Data, Typeable)
 
-data VarBinding = VarBinding   CToken (Maybe (CToken, AsType)) (Maybe (CToken, AssignE)) --varbinding with Type-- identifier, (maybe (:, datatype)), (maybe (=, assignE)), maybe ','
+data VarBinding = VarBinding   CToken (Maybe (CToken, AsType)) (Maybe (CToken, AssignE)) --varbinding with Type-- identifier, (maybe (:, datatype)), (maybe (=, assignE))
     deriving (Show, Data, Typeable)
 
 data Signature =  Signature  CToken [Arg] CToken (Maybe (CToken, AsType)) -- left paren, arguments, right paren, :,  return type
