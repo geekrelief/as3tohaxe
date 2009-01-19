@@ -131,7 +131,7 @@ interfaceExtends = do{ k <- kw "extends"; s <- many1 (do{n <- nident; c <- optio
 
 classDecl = do{ a <- classAttributes; k <- kw "class"; i <- ident; e <- optionMaybe(classExtends); im <- optionMaybe(classImplements); storeClass i; b <- classBlock; return $ ClassDecl a k i e im b}
 
-classAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> (kw "internal"))) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "dynamic")
+classAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "internal"])) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "dynamic")
     where list v s d = filter (\a -> fst a /= []) [v,s,d]
 
 classExtends = do{ k <- kw "extends"; s <- nident; return $ (k, s)}
@@ -149,7 +149,7 @@ methodDecl = try(do{ attr <- methodAttributes
                ; storeProperty n acc sig
                ; return $ MethodDecl attr k acc n sig b})
 
-methodAttributes = permute $ list <$?> (emptyctok, (try (kw "public") <|> try (kw "private") <|> (kw "protected"))) <|?> (emptyctok, ident) <|?> (emptyctok, kw "internal") <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
+methodAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected", kw "internal"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "internal") <|?> (emptyctok, kw "override") <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "final") <|?> (emptyctok, kw "native")
     where list v ns i o s f n = filter (\a -> fst a /= []) [v,ns,i,o,s,f,n]
 
 signature = do{ lp <- op "("; a <- sigargs; rp <- op ")"; ret <- optionMaybe ( do{ o <- op ":"; r <- datatype; return (o, r)}); return $ Signature lp a rp ret} -- missing return type means constructor
@@ -168,6 +168,14 @@ sigarg = try(do{ a <- idn; o <- op ":";
              })
      <|> do{ d <- op "..."; i <- idn; t <- optionMaybe (do{ o <- op ":"; t <- datatype; return (o, t)}); storeVar i AsTypeRest; return $ RestArg d i t }
 
+-- extractDynamicType used by sigarg to split TokenOp *= into the * datatype and = for assignment
+extractDynamicType ([t], s) = (([dt], []), ([eq], s))
+    where sourceName = tokenSource t
+          sourceLine = tokenLine t
+          sourceCol  = tokenCol t
+          dt = (TPos sourceName sourceLine sourceCol, TokenOp "*")
+          eq = (TPos sourceName sourceLine (sourceCol+1), TokenOp "=")
+ 
 varS = try(do{ ns <- varAttributes
              ; k <- choice[kw "var", kw "const"]
              ; v <- varBinding
@@ -176,30 +184,8 @@ varS = try(do{ ns <- varAttributes
              }
           )
 
-varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
+varAttributes = permute $ list <$?> (emptyctok, (choice[kw "public", kw "private", kw "protected", kw "internal"])) <|?> (emptyctok, ident) <|?> (emptyctok, kw "static") <|?> (emptyctok, kw "native")
     where list v ns s n = filter (\a -> fst a /= []) [v,ns,s,n]
-
-{-
-varBinding = try(do n <- idn
-                    t <- optionMaybe(do{c <- op ":"; dt <- datatype; return (c, dt)})
-                    i <- optionMaybe (do{ o <- op "="; e <- assignE; return $ (o, e)})
-                    return $ VarBinding n t i
-                )
-             <|> do n <- idn
-                    c <- op ":"
-                    dt <- op "*="
-                    let (dt', o) = extractDynamicType dt
-                    e <- assignE;
-                    return $ VarBinding n (Just (c, AsType dt')) (Just (o, e))
--}
-
-extractDynamicType ([t], s) = (([dt], []), ([eq], s))
-    where sourceName = tokenSource t
-          sourceLine = tokenLine t
-          sourceCol  = tokenCol t
-          dt = (TPos sourceName sourceLine sourceCol, TokenOp "*")
-          eq = (TPos sourceName sourceLine (sourceCol+1), TokenOp "=")
- 
 
 varBinding = try(do{ n <- idn
                    ; t <- optionMaybe(do{c <- op ":"; dt <- datatype; return (c, dt)})
@@ -226,7 +212,7 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
 
 primaryE = try(do{ x <- kw "this"; return $ PEThis x})
        <|> try(do{ x <- idn; return $ PEIdent x})
-       <|> try(do{ x <- choice[(kw "null"), (kw "true"), (kw "false"), (kw "public"), (kw "private"), (kw "protected"), (kw "internal")]; return $ PELit x})
+       <|> try(do{ x <- choice[kw "null", kw "true", kw "false", kw "public", kw "private", kw "protected", kw "internal"]; return $ PELit x})
        <|> try(do{ x <- str; return $ PELit x})
        <|> try(do{ x <- num; return $ PELit x})
        <|> try(do{ x <- arrayLit; return $ PEArray x})

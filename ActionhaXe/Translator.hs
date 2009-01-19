@@ -280,7 +280,7 @@ methodDecl (MethodDecl a f ac n s b) = do
 imethodDecl (MethodDecl a f ac n s b) = do 
     s' <- signature s
     return $ attr a ++ showb f ++ showb n ++ s'
-    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "private" ++ showw attr; x -> showb attr }) as
+    where attr as = concat $ map (\attr -> case (showd attr) of { "internal" -> "public" ++ showw attr; x -> showb attr }) as
 
 
 signatureArgs (Signature l args r ret) = do{ a <- showArgs args
@@ -365,9 +365,9 @@ getTypeTokenType (TokenKw "false") = Just "Bool"
 getTypeTokenType _ = Nothing
 
 namespace ns = concat $ map (\attr -> (case showd attr of { "private" -> "" -- all fields by default are private
-                                                          ; "protected" -> "" -- in haXe private  fields are accessible by subclasses
-                                                          ; "internal" -> ""
-                                                          ; "dynamic" -> ""
+                                                          ; "protected" -> "" -- in haXe private fields are accessible by subclasses
+                                                          ; "internal" -> "public" ++ showw attr -- internal fields are used by different packages in as3
+                                                          ; "dynamic" -> "dynamic /*class must implement Dynamic<Dynamic>*/" ++ showw attr
                                                           ; "final" -> ""
                                                           ; _ -> showb attr 
                                                           }
