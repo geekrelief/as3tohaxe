@@ -141,7 +141,7 @@ classImplements = do{ k <- kw "implements"; s <- many1 (do{n <- nident; c <- opt
 methodDecl = try(do{ attr <- methodAttributes
                ; k <- kw "function"
                ; acc <- optionMaybe( try(kw "get") <|> (kw "set"))
-               ; n <- nident
+               ; n <- nident <|> (kw "each")
                ; enterScope
                ; sig <- signature
                ; b <- optionMaybe funcBlock
