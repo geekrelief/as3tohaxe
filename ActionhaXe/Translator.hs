@@ -394,11 +394,13 @@ datatype d =
                                   "Array"   -> return "Array<Dynamic>"
                                   "XML"     -> return "XML"
                                   "RegExp"  -> return "EReg"
+                                  "Class"   -> return "Class<Dynamic>"
                               )
                        return $ d' ++ showw n
         AsTypeRest -> return "Array<Dynamic>"
         AsTypeUser n -> return $ showb n
 
+-- Changes type based on initializer value
 datatypeiM d Nothing = datatype d
 datatypeiM d i = 
     case d of
@@ -424,6 +426,7 @@ datatypeiM d i =
                             "Array"   -> return "Array<Dynamic>"
                             "XML"     -> return "XML"
                             "RegExp"  -> return "EReg"
+                            "Class"   -> return "Class<Dynamic>"
                       ; return $ r ++ showw n
                       }
         AsTypeRest -> return $ "Array<Dynamic>"

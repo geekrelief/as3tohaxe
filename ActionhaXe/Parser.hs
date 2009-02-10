@@ -140,7 +140,7 @@ classImplements = do{ k <- kw "implements"; s <- many1 (do{n <- nident; c <- opt
 
 methodDecl = try(do{ attr <- methodAttributes
                ; k <- kw "function"
-               ; acc <- optionMaybe(try(do{ k <- (kw "get" <|> kw "set"); try(do{ o <- op "("; unexpected (showb o)}); return k}))
+               ; acc <- optionMaybe(try(do{ k <- (kw "get" <|> kw "set"); try(do{ o <- op "("; unexpected (showb o)} <|> return ()); return k}))
                ; n <- choice[ nident, kw "each", kw "get", kw "set", kw "include", kw "override"]
                ; enterScope
                ; sig <- signature
@@ -207,6 +207,7 @@ datatype = try(do{ t <- kw "void";      return $ AsType t})
        <|> try(do{ t <- mid "Function"; return $ AsType t})
        <|> try(do{ t <- mid "RegExp";   return $ AsType t})
        <|> try(do{ t <- mid "XML";      return $ AsType t})
+       <|> try(do{ t <- mid "Class";    return $ AsType t})
 -- Vector.<*> new in flash 10
        <|> do{ i <- ident; return $ AsTypeUser i}
 
