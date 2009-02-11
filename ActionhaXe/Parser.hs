@@ -221,6 +221,8 @@ primaryE = try(do{ x <- kw "this"; return $ PEThis x})
 --       <|> try(do{ x <- reg; return $ PERegex x})
        <|> try(do{ x <- xml; return $ PEXml x})
        <|> try(do{ x <- funcE; return $ PEFunc x})
+       <|> try(do{ x <- kw "get"; return $ PEIdent x})
+       <|> try(do{ x <- kw "set"; return $ PEIdent x})
        <|> do{ x <- parenE; return $ x} 
 
 arrayLit = try(do{ l <- op "["; e <- elementList; r <- op "]"; return $ ArrayLit l e r})
@@ -276,7 +278,7 @@ superE = do{ k <- kw "super"; p <- optionMaybe args; return $ SuperE k p}
 
 args = do{ l <- op "("; e <- optionMaybe listE; r <- op ")"; return $ Arguments l e r}
 
-propertyOp = try(do{ o <- op "."; n <- idn; return $ PropertyOp o n})
+propertyOp = try(do{ o <- op "."; n <- choice[idn, kw "get", kw "set"]; return $ PropertyOp o n})
          <|> do{ l <- op "["; e <- listE; r <- op "]"; return $ PropertyB l e r}
 
 queryOp = try(do{ o <- op ".."; n <- nident; return $ QueryOpDD o n})
