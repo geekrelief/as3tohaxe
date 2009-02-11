@@ -64,6 +64,7 @@ inClassBlock = try(do{ lookAhead( op "}"); return [] })
       <|> try(do{ x <- metadata; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- methodDecl; i <- inClassBlock; return $ [x] ++ i})
       <|> try(do{ x <- varS; i <- inClassBlock; return $ [x] ++ i})
+      <|> try(do{ x <- block; i <- inClassBlock; return $ [x] ++ i }) -- there can be blocks in classes for static initializations
       <|>    (do{ x <- anytok; i <- inClassBlock; return $ [(Tok x)] ++ i})
 
 interfaceBlock = do{ l <- op "{"; enterScope; x <- inInterfaceBlock; r <- op "}"; exitScope; return $ Block l x r }

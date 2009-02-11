@@ -79,7 +79,7 @@ keywords = [ "...", "as", "break", "case", "catch", "class", "const", "continue"
              "implements", "import", "in", "instanceof", "interface", "internal", "is", 
              "native", "new", "null", "package", 
              "private", "protected", "public", "return", "super", "switch", "this", "throw", 
-             "to", "true", "try", "typeof", "use", "undefined", "var", "void", "while", "with",
+             "true", "try", "typeof", "use", "undefined", "var", "void", "while", "with",
 -- syntactic keywords
              "each", "get", "set", "namespace", "include", "dynamic", "final", "native",
              "override", "static"

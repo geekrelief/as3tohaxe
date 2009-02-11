@@ -171,6 +171,7 @@ classBlockItem b =
                 MethodDecl _ _ _ _ _ _      -> methodDecl b >>= return
                 VarS _ _ _ _                -> memberVarS b >>= return
                 Metadata m                  -> metadata m >>= return
+                Block _ _ _                 -> block b >>= return
                 _                           -> return $ show b
        return x
 
