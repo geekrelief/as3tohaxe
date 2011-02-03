@@ -1,8 +1,14 @@
 as3tohaxe - An Actionscript 3 to haXe source file converter written in Haskell
 Copyright (C) 2008-2009 Don-Duong Quach
 
+This is NOT a complete converter.  It is not possible for haXe to override the
+getters and setters of native Flash classes (e.g. Sprite), so converting your
+as3 code to haxe completely is not possible as far as I know.  
+
+So I stopped working on the project, but the code and executable may still be 
+useful to someone.
+
 For more info check visit: 
-http://groups.google.com/group/as3tohaxe
 http://www.github.com/geekrelief/as3tohaxe
 http://geekrelief.wordpress.com
 
@@ -30,5 +36,3 @@ or the './build' script
 -- License --
 This program and its source is GPL licensed.  Please read the LICENSE
 for more details.
-
-Donations are appreciated!

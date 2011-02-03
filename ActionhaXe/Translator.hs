@@ -411,9 +411,9 @@ datatypeiM d i =
                             "uint"    -> return "UInt"
                             "int"     -> return "Int"
                             "Number"  -> do  case i of
-                                                 Just (o, e) -> do{ if hasFloat e
-                                                                        then return "Float"
-                                                                        else return "Int"
+                                                 Just (o, e) -> do{ if hasIntegerInit e
+                                                                        then return "Int"
+                                                                        else return "Float"
                                                                   } 
                                                  Nothing -> do ni <- getCLArg NumberToInt
                                                                if ni
@@ -433,10 +433,17 @@ datatypeiM d i =
         AsTypeRest -> return $ "Array<Dynamic>"
         AsTypeUser n -> return $ showb n
 
+hasIntegerInit = everything (||) (False `mkQ` isIntegerInit)
+
+isIntegerInit (TokenInteger x) = True
+isIntegerInit _ = False
+
+{-
 hasFloat = everything (||) (False `mkQ` isFloat)
 
 isFloat (TokenDouble x) = True
 isFloat _ = False
+-}
 
 primaryE x = case x of
                  PEThis x -> do{ return $ showb x}
